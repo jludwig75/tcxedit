@@ -2,6 +2,17 @@ import sys
 import xml.etree.ElementTree as ET
 import time
 import math
+import Gnuplot
+import tempfile
+import os
+import numpy
+
+def wait(str=None, prompt='Press return to show results...\n'):
+    if str is not None:
+        print str
+    raw_input(prompt)
+
+
 
 TIME_FORMAT_STRING = '%Y-%m-%dT%H:%M:%SZ'
 NS = '{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}'
@@ -156,8 +167,13 @@ class LapInfo:
         self.timeDescending = 0
         self.ascendingMeters = 0
         self.descendingMeters = 0
-        
         self.joules = 0
+        
+        self.times = []
+        self.altitudes = []
+        self.speeds = []
+        self.powers = []
+        self.heartRates = []
     
     def UpdateLapStats(self):
         self.lapXml.find(TAG_NAME('TotalTimeSeconds')).text = '%.7f' % self.GetTotalRecordedTime()
@@ -205,6 +221,49 @@ class LapInfo:
         print '      Meters ascended  = %.1f in %.1f meters %.1f seconds = %.1f joules' % (self.metersAscended, self.ascendingMeters, self.timeAscending, joulesAscending) 
         print '      Meters descended = %.1f in %.1f meters %.1f seconds = %.1f joules' % (self.metersDescended, self.descendingMeters, self.timeDescending, joulesDescending)
         print '      Total joules = %f, joules / calories = %f' % (totalJoules, totalJoules / self.reportedCalories)
+    
+    def Plot(self):
+        g = Gnuplot.Gnuplot(debug=1)
+        g.clear()
+        filename1 = tempfile.mktemp()
+        f = open(filename1, 'w')
+        filename2 = tempfile.mktemp()
+        f2 = open(filename2, 'w')
+        #filename3 = tempfile.mktemp()
+        #f3 = open(filename2, 'w')
+        try:
+            for i in range(len(self.times)):
+                f.write('%s %s\n' % (self.times[i], self.altitudes[i]))
+            f.close()
+
+            for i in range(len(self.times)):
+                f2.write('%s %s\n' % (self.times[i], self.speeds[i]))
+            f2.close()
+
+            #for i in range(len(self.times)):
+            #    f3.write('%s %s\n' % (self.times[i], self.heartRates[i]))
+            #f3.close()
+
+            g.xlabel('time (seconds)')
+            
+            g("set yrange [1670:1800]")
+            g("set ytics 100 nomirror tc lt 1")
+            g("set ylabel 'altitude' tc lt 1")
+
+            g("set y2range [0:10]")
+            g("set y2tics 5 nomirror tc lt 2")
+            g("set y2label 'speed' tc lt 2")
+                        
+            g.plot(Gnuplot.File(filename1, with_='lines'),
+                   Gnuplot.File(filename2, with_='lines axes x1y2'))
+            #g.plot(Gnuplot.File(filename1, with_='linetype 1'),
+            #       Gnuplot.File(filename2, with_='linetype 2'))
+            wait('Set title and axis labels and try replot()')
+    
+        finally:
+            os.unlink(filename1)
+            #os.unlink(filename2)
+            
         
     def ProcessTrackPoint(self, trackPoint, activityStartTime, stopTime):
         activityTimeElapsed = trackPoint.time - activityStartTime
@@ -242,6 +301,13 @@ class LapInfo:
             if speed > self.maxSpeed:
                 self.maxSpeed = speed
 
+            power = CalcForceOfMotion(staticData, hDistance, vDistance, intervalTime) * speed
+            self.times.append(elapsed)
+            self.speeds.append(speed)
+            self.heartRates.append(trackPoint.heartRate)
+            self.altitudes.append(trackPoint.altitude)
+            self.powers.append(power)
+            
             if trackPoint.position and self.lastPositiion:
                 gpsIntervalDistance = trackPoint.position.Distance(self.lastPositiion)
                 gpsSpeed = gpsIntervalDistance / intervalTime
@@ -327,6 +393,7 @@ class TcxVisitor:
             for lap in activity.laps:
                 print '  Lap'
                 lap.Dump()
+                lap.Plot()
             print ' Total activity time = %.2f' % activity.totalTime
 
 
