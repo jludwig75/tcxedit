@@ -229,8 +229,10 @@ class LapInfo:
         f = open(filename1, 'w')
         filename2 = tempfile.mktemp()
         f2 = open(filename2, 'w')
-        #filename3 = tempfile.mktemp()
-        #f3 = open(filename2, 'w')
+        filename3 = tempfile.mktemp()
+        f3 = open(filename3, 'w')
+        filename4 = tempfile.mktemp()
+        f4 = open(filename4, 'w')
         try:
             for i in range(len(self.times)):
                 f.write('%s %s\n' % (self.times[i], self.altitudes[i]))
@@ -240,29 +242,43 @@ class LapInfo:
                 f2.write('%s %s\n' % (self.times[i], self.speeds[i]))
             f2.close()
 
-            #for i in range(len(self.times)):
-            #    f3.write('%s %s\n' % (self.times[i], self.heartRates[i]))
-            #f3.close()
+            for i in range(len(self.times)):
+                f3.write('%s %s\n' % (self.times[i], self.heartRates[i]))
+            f3.close()
+
+            for i in range(len(self.times)):
+                f4.write('%s %s\n' % (self.times[i], self.powers[i]))
+            f4.close()
 
             g.xlabel('time (seconds)')
             
-            g("set yrange [1670:1800]")
-            g("set ytics 100 nomirror tc lt 1")
-            g("set ylabel 'altitude' tc lt 1")
+            #g("set yrange [1670:1800]")
+            #g("set ytics 100 nomirror tc lt 1")
+            #g("set ylabel 'altitude' tc lt 1")
 
-            g("set y2range [0:10]")
-            g("set y2tics 5 nomirror tc lt 2")
-            g("set y2label 'speed' tc lt 2")
+            #g("set y2range [0:10]")
+            #g("set y2tics 5 nomirror tc lt 2")
+            #g("set y2label 'speed' tc lt 2")
+            
+            g('set multiplot')
                         
-            g.plot(Gnuplot.File(filename1, with_='lines'),
-                   Gnuplot.File(filename2, with_='lines axes x1y2'))
+            g.plot(Gnuplot.File(filename1, with_='lines linecolor 1'))
+            g.plot(Gnuplot.File(filename2, with_='lines linecolor 2'))
+            g("set yrange [0:200]")
+            g.plot(Gnuplot.File(filename3, with_='lines linecolor 3'))
+            g("set yrange [0:300]")
+            g.plot(Gnuplot.File(filename4, with_='lines linecolor 4'))
+            
+            g('unset multiplot')
             #g.plot(Gnuplot.File(filename1, with_='linetype 1'),
             #       Gnuplot.File(filename2, with_='linetype 2'))
             wait('Set title and axis labels and try replot()')
     
         finally:
             os.unlink(filename1)
-            #os.unlink(filename2)
+            os.unlink(filename2)
+            os.unlink(filename3)
+            os.unlink(filename4)
             
         
     def ProcessTrackPoint(self, trackPoint, activityStartTime, stopTime):
@@ -306,7 +322,7 @@ class LapInfo:
             self.speeds.append(speed)
             self.heartRates.append(trackPoint.heartRate)
             self.altitudes.append(trackPoint.altitude)
-            self.powers.append(power)
+            self.powers.append(power if power > 0 else 0)
             
             if trackPoint.position and self.lastPositiion:
                 gpsIntervalDistance = trackPoint.position.Distance(self.lastPositiion)
