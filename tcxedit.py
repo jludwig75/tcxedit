@@ -126,6 +126,101 @@ def ErrorPercent(actual, calculated):
         return 0
     return 100.0 * (float(calculated) - float(actual)) / float(actual)
 
+def ApplyFilter(data, filter):
+    mid = len(filter) / 2
+    new_data = [0] * len(data)
+    for i in range(len(data)):
+        sum = 0
+        count = 0
+        for j in range(-mid, mid + 1):
+            idx = i + j
+            if idx >= 0 and idx < len(data):
+                sum += data[idx] * filter[mid + j]
+                count += 1
+        new_data[i] = sum / count
+    return new_data
+            
+def SmoothData(dataArray, width):
+    filter = [1] * width
+    return ApplyFilter(dataArray, filter)
+
+
+class WorkOutAnalyzer:
+    def __init__(self, staticData, times, distances, altitudes, heartRates):
+        self.staticData = staticData
+        self.times = times
+        self.distances = distances
+        self.altitudes = altitudes
+        self.heartRates = heartRates
+    
+    def Analyze(self):
+        self.PreProcess()
+        self.Process()
+        self.PostProcess()
+    
+    def PreProcess(self):
+        # Smooth sensor data
+        self.altitudes = SmoothData(self.altitudes, 5)
+        self.heartRates = SmoothData(self.heartRates, 5)
+        
+        # Calculate speeds
+        self.speeds = [0] * len(self.times)
+        self.slopes = [0] * len(self.times)
+        lastTime = 0
+        lastDistance = 0
+        lastAltitude = self.altitudes[0]
+        for i in range(len(self.times)):
+            hDistance = self.distances[i] - lastDistance
+            vDistance = self.altitudes[i] - lastAltitude
+            self.speeds[i] = hDistance / (self.times[i] - lastTime)
+            self.slopes[i] = math.pi / 2
+            if hDistance > 0:
+                self.slopes[i] = math.atan(vDistance / hDistance)
+            lastTime = self.times[i]
+            lastDistance = self.distances[i]
+            lastAltitude = self.altitudes[i]
+        
+        # Smooth the speeds
+        self.speeds = SmoothData(self.speeds, 5)
+    
+    def Process(self):
+        self.ft = [0] * len(self.times)
+        self.ff = [0] * len(self.times)
+        self.fd = [0] * len(self.times)
+        self.fs = [0] * len(self.times)
+        self.fr = [0] * len(self.times)
+        for i in range(1, len(self.times)):
+            speedIn = self.speeds[i-1]
+            speedOut = self.speeds[i]
+            intervalTime = self.times[i] - self.times[i-1]
+            avgSpeed = (speedIn + speedOut) / 2 
+            vDistance = self.altitudes[i] - self.altitudes[i-1]
+            distance = self.distances[i] - self.distances[i-1]
+            if abs(vDistance) > abs(distance):
+                print 'Unexpected horizontal distance greater than total distance!'
+                # I guess this would be dropping :)
+                hDistance = 0
+            else:
+                hDistance = math.sqrt(distance * distance - vDistance * vDistance)
+            print 'sIn = %.2f, sOut = %.2f, sAvg = %.2f, iTime = %.2f, dist = %.3f, vDist = %.3f, hDist = %.3f' % (speedIn, speedOut, avgSpeed, intervalTime, distance, vDistance, hDistance)
+            # Calculate total force Ft from change in momentum
+            Ft = self.staticData.weight * (speedOut - speedIn) / intervalTime
+            self.ft[i] = Ft
+            # Calculate component forces
+            Ff = self.staticData.friction * self.staticData.weight * ACCEL_OF_GRAVITY
+            self.ff[i] = Ff
+            Fd = ForceOfDrag(self.staticData, avgSpeed)
+            self.fd[i] = Fd
+            Fs = self.staticData.weight * ACCEL_OF_GRAVITY * vDistance / distance
+            self.fs[i] = Fs
+            # Caclulate rider force
+            Fr = Ft + (Ff + Fd + Fs)
+            self.fr[i] = Fr
+            print 'Ft = %.2f, Ff = %.2f, Fd = %.2f, Fs = %.2f, Fr = %.2f' % (Ft, Ff, Fd, Fs, Fr)
+    
+    def PostProcess(self):
+        pass
+    
 class LapInfo:
     def __init__(self, lapXml):
         
@@ -171,9 +266,10 @@ class LapInfo:
         
         self.times = []
         self.altitudes = []
+        self.heartRates = []
+        self.distances = []
         self.speeds = []
         self.powers = []
-        self.heartRates = []
     
     def UpdateLapStats(self):
         self.lapXml.find(TAG_NAME('TotalTimeSeconds')).text = '%.7f' % self.GetTotalRecordedTime()
@@ -221,8 +317,15 @@ class LapInfo:
         print '      Meters ascended  = %.1f in %.1f meters %.1f seconds = %.1f joules' % (self.metersAscended, self.ascendingMeters, self.timeAscending, joulesAscending) 
         print '      Meters descended = %.1f in %.1f meters %.1f seconds = %.1f joules' % (self.metersDescended, self.descendingMeters, self.timeDescending, joulesDescending)
         print '      Total joules = %f, joules / calories = %f' % (totalJoules, totalJoules / self.reportedCalories)
+        wa = WorkOutAnalyzer(staticData, self.times, self.distances, self.altitudes, self.heartRates)
+        wa.Analyze()
+        #sys.exit(0)
     
     def Plot(self):
+        
+        self.powers = SmoothData(self.powers, 15)
+        self.speeds = SmoothData(self.speeds, 15)
+        
         g = Gnuplot.Gnuplot(debug=1)
         g.clear()
         filename1 = tempfile.mktemp()
@@ -319,9 +422,10 @@ class LapInfo:
 
             power = CalcForceOfMotion(staticData, hDistance, vDistance, intervalTime) * speed
             self.times.append(elapsed)
-            self.speeds.append(speed)
             self.heartRates.append(trackPoint.heartRate)
             self.altitudes.append(trackPoint.altitude)
+            self.distances.append(trackPoint.distance)
+            self.speeds.append(speed)
             self.powers.append(power if power > 0 else 0)
             
             if trackPoint.position and self.lastPositiion:
@@ -409,7 +513,7 @@ class TcxVisitor:
             for lap in activity.laps:
                 print '  Lap'
                 lap.Dump()
-                lap.Plot()
+                #lap.Plot()
             print ' Total activity time = %.2f' % activity.totalTime
 
 
