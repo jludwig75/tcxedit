@@ -145,6 +145,64 @@ def SmoothData(dataArray, width):
     return ApplyFilter(dataArray, filter)
 
 
+class PlotData:
+    def __init__(self, title, xdata, ydata):
+        self.title = title
+        self.xdata = xdata
+        self.ydata = ydata
+        self.min = self.ydata[0]
+        self.max = self.ydata[0]
+        for value in ydata[1:]:
+            if value > self.max:
+                self.max = value
+            if value < self.min:
+                self.min = value
+    
+    def yRange(self):
+        return self.max - self.min
+    
+    def ScaleData(self, yResolution):
+        # Always normalize the data to 0
+        # Always scale normalized data from 0 to yResolution
+        base = self.min
+        yRange = self.yRange()
+        newYData = [0] * len(self.ydata)
+        for i in range(len(self.ydata)):
+            newYData[i] = (self.ydata[i] - base) * yResolution / yRange
+        self.ydata = newYData
+    
+    def WriteToTempFile(self):
+        self.tempFileName = tempfile.mktemp()
+        f = open(self.tempFileName, 'w')
+        for i in range(len(self.xdata)):
+            f.write('%s %s\n' % (self.xdata[i], self.ydata[i]))
+        f.close()
+        return self.tempFileName
+
+class MuliPlotter:
+    def __init__(self, yResolution):
+        self.yResolution = yResolution
+        self.plots = []
+    
+    def AddPlot(self, plot):
+        plot.ScaleData(self.yResolution)
+        self.plots.append(plot)
+    
+    def Plot(self):
+        g = Gnuplot.Gnuplot(debug=1)
+        g.clear()
+        plots = []
+        color = 1
+        g.xlabel('time (seconds)')
+        for plot in self.plots:
+            fn = plot.WriteToTempFile()
+            g.ylabel(plot.title)
+            plots.append(Gnuplot.File(fn, with_='lines linecolor %d' % color, title='%s (%.2f - %.2f)' % (plot.title, plot.min, plot.max)))
+            color += 1
+        g.plot(*plots)
+        wait('Press Enter')
+
+
 class WorkOutAnalyzer:
     def __init__(self, staticData, times, distances, altitudes, heartRates):
         self.staticData = staticData
@@ -160,8 +218,9 @@ class WorkOutAnalyzer:
     
     def PreProcess(self):
         # Smooth sensor data
-        self.altitudes = SmoothData(self.altitudes, 5)
-        self.heartRates = SmoothData(self.heartRates, 5)
+        self.altitudes = SmoothData(self.altitudes, 3)
+        self.heartRates = SmoothData(self.heartRates, 3)
+        self.distances = SmoothData(self.distances, 3)
         
         # Calculate speeds
         self.speeds = [0] * len(self.times)
@@ -170,18 +229,47 @@ class WorkOutAnalyzer:
         lastDistance = 0
         lastAltitude = self.altitudes[0]
         for i in range(len(self.times)):
-            hDistance = self.distances[i] - lastDistance
+            distance = self.distances[i]
             vDistance = self.altitudes[i] - lastAltitude
-            self.speeds[i] = hDistance / (self.times[i] - lastTime)
-            self.slopes[i] = math.pi / 2
-            if hDistance > 0:
-                self.slopes[i] = math.atan(vDistance / hDistance)
+            self.speeds[i] = distance / (self.times[i] - lastTime)
+
+            # Handle slope here
+            
+            # Ignore negligible values 
+            if distance <= 0.1:
+                distance = 0
+            if abs(vDistance) < 0.1:
+                vDistance = 0
+                
+            # Don't allow a rise when there was no horizontal distance traveled
+            if distance == 0:
+                vDistance = 0
+            elif abs(vDistance) > 0.5 * distance:    # Don't allow more then 50% grade
+                vDistance = 0.5 * distance * vDistance / abs(vDistance)
+                
+            # Calculate the horizontal distance
+            if distance == 0:
+                hDistance = 0
+            else:
+                hDistance = math.sqrt(distance * distance - vDistance * vDistance)
+            
+            # Now calculate the slope
+            if hDistance == 0:    
+                self.slopes[i] = 0  # To avoid divide by zerp
+            else:
+                slope = math.atan(vDistance / hDistance)
+                if slope > 0.2 or slope < -0.15:
+                    print '%.4f / %.4f' % (vDistance, hDistance)
+                self.slopes[i] = slope
+
             lastTime = self.times[i]
             lastDistance = self.distances[i]
             lastAltitude = self.altitudes[i]
         
         # Smooth the speeds
-        self.speeds = SmoothData(self.speeds, 5)
+        self.speeds = SmoothData(self.speeds, 3)
+        # Smooth the slopes
+        self.slopes = SmoothData(self.slopes, 3)
     
     def Process(self):
         self.ft = [0] * len(self.times)
@@ -195,14 +283,14 @@ class WorkOutAnalyzer:
             intervalTime = self.times[i] - self.times[i-1]
             avgSpeed = (speedIn + speedOut) / 2 
             vDistance = self.altitudes[i] - self.altitudes[i-1]
-            distance = self.distances[i] - self.distances[i-1]
+            distance = self.distances[i]
             if abs(vDistance) > abs(distance):
                 print 'Unexpected horizontal distance greater than total distance!'
                 # I guess this would be dropping :)
                 hDistance = 0
             else:
                 hDistance = math.sqrt(distance * distance - vDistance * vDistance)
-            print 'sIn = %.2f, sOut = %.2f, sAvg = %.2f, iTime = %.2f, dist = %.3f, vDist = %.3f, hDist = %.3f' % (speedIn, speedOut, avgSpeed, intervalTime, distance, vDistance, hDistance)
+            #print 'sIn = %.2f, sOut = %.2f, sAvg = %.2f, iTime = %.2f, dist = %.3f, vDist = %.3f, hDist = %.3f' % (speedIn, speedOut, avgSpeed, intervalTime, distance, vDistance, hDistance)
             # Calculate total force Ft from change in momentum
             Ft = self.staticData.weight * (speedOut - speedIn) / intervalTime
             self.ft[i] = Ft
@@ -216,10 +304,21 @@ class WorkOutAnalyzer:
             # Caclulate rider force
             Fr = Ft + (Ff + Fd + Fs)
             self.fr[i] = Fr
-            print 'Ft = %.2f, Ff = %.2f, Fd = %.2f, Fs = %.2f, Fr = %.2f' % (Ft, Ff, Fd, Fs, Fr)
+            #print 'Ft = %.2f, Ff = %.2f, Fd = %.2f, Fs = %.2f, Fr = %.2f' % (Ft, Ff, Fd, Fs, Fr)
     
     def PostProcess(self):
-        pass
+        mp = MuliPlotter(10000)
+        
+        #mp.AddPlot(PlotData("speed", self.times, self.speeds))
+        mp.AddPlot(PlotData("altitude", self.times, self.altitudes))
+        mp.AddPlot(PlotData("distance", self.times, self.distances))
+        #mp.AddPlot(PlotData("total force", self.times, self.ft))
+        mp.AddPlot(PlotData("slope", self.times, self.slopes))
+        #mp.AddPlot(PlotData("slope force", self.times, self.fs))
+        
+        mp.Plot()
+        sys.exit(0)
+        
     
 class LapInfo:
     def __init__(self, lapXml):
@@ -424,7 +523,7 @@ class LapInfo:
             self.times.append(elapsed)
             self.heartRates.append(trackPoint.heartRate)
             self.altitudes.append(trackPoint.altitude)
-            self.distances.append(trackPoint.distance)
+            self.distances.append(intervalDistance)
             self.speeds.append(speed)
             self.powers.append(power if power > 0 else 0)
             
