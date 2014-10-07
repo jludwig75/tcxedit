@@ -300,18 +300,19 @@ class WorkOutAnalyzer:
             hDistance = math.sqrt(distance * distance - vDistance * vDistance)
             #print 'sIn = %.2f, sOut = %.2f, sAvg = %.2f, iTime = %.2f, dist = %.3f, vDist = %.3f, hDist = %.3f' % (speedIn, speedOut, avgSpeed, intervalTime, distance, vDistance, hDistance)
             # Calculate total force Ft from change in momentum
-            Ft = self.staticData.weight * (speedOut - speedIn) / intervalTime
-            self.ft[i] = Ft
+            self.ft[i] = self.staticData.weight * (speedOut - speedIn) / intervalTime
+
             # Calculate component forces
-            Ff = self.staticData.friction * self.staticData.weight * ACCEL_OF_GRAVITY
-            self.ff[i] = Ff
-            Fd = ForceOfDrag(self.staticData, avgSpeed)
-            self.fd[i] = Fd
+            # Friction
+            self.ff[i] = self.staticData.friction * self.staticData.weight * ACCEL_OF_GRAVITY
+            # Drag
+            self.fd[i] = ForceOfDrag(self.staticData, avgSpeed)
+            
+            # Slope force (due to gravity)
             if distance > 0:
-                Fs = self.staticData.weight * ACCEL_OF_GRAVITY * vDistance / distance
+                self.fs[i] = self.staticData.weight * ACCEL_OF_GRAVITY * vDistance / distance
             else:
-                Fs = 0
-            self.fs[i] = Fs
+                self.fs[i] = 0
 
     def CalculateRiderForce(self):
         self.fr = [0] * len(self.times)
@@ -320,8 +321,18 @@ class WorkOutAnalyzer:
         
     def CalculateWorkAndPower(self):
         self.power = [0] * len(self.times)
+        self.joules = 0
+        self.joulesPerInterval = [0] * len(self.times)
+        self.joulesCum = [0] * len(self.times)
         for i in range(1, len(self.times)):
             self.power[i] = self.fr[i] * self.speeds[i]
+            if self.fr[i] < 0:
+                joules = 0
+            else:
+                joules = self.fr[i] * self.distances[i]
+            self.joules += joules
+            self.joulesPerInterval[i] = joules
+            self.joulesCum[i] = self.joules
         
     def Process(self):
         self.CalculateExternalForces()
@@ -354,6 +365,7 @@ class WorkOutAnalyzer:
         #mp.AddPlot(PlotData("Fr", self.times, self.ft))
         #mp.AddPlot(PlotData("Ft", self.times, self.fr))
         mp.AddPlot(PlotData("power", self.times, self.power))
+        mp.AddPlot(PlotData("work", self.times, self.joulesCum))
         
         mp.Plot()
         sys.exit(0)
