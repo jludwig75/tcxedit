@@ -161,7 +161,15 @@ class PlotData:
     def yRange(self):
         return self.max - self.min
     
+    def IsMidLineVisible(self):
+        #print '[%.4f - %.f4' % ()
+        return self.min < 0 and self.max > 0
+
+    def GetMidLine(self):
+        return self.yResolution * (0 - self.min) / self.yRange()
+    
     def ScaleData(self, yResolution):
+        self.yResolution = yResolution
         # Always normalize the data to 0
         # Always scale normalized data from 0 to yResolution
         base = self.min
@@ -198,6 +206,8 @@ class MuliPlotter:
             fn = plot.WriteToTempFile()
             g.ylabel(plot.title)
             plots.append(Gnuplot.File(fn, with_='lines linecolor %d' % color, title='%s (%.2f - %.2f)' % (plot.title, plot.min, plot.max)))
+            if plot.IsMidLineVisible():
+                plots.append(Gnuplot.Func('%.4f' % plot.GetMidLine(), with_='lines linecolor %d' % color, title=''))
             color += 1
         g.plot(*plots)
         wait('Press Enter')
@@ -225,6 +235,7 @@ class WorkOutAnalyzer:
         # Calculate speeds
         self.speeds = [0] * len(self.times)
         self.slopes = [0] * len(self.times)
+        self.vDistances = [0] * len(self.times)
         lastTime = 0
         lastDistance = 0
         lastAltitude = self.altitudes[0]
@@ -252,6 +263,9 @@ class WorkOutAnalyzer:
                 hDistance = 0
             else:
                 hDistance = math.sqrt(distance * distance - vDistance * vDistance)
+                
+            self.distances[i] = distance
+            self.vDistances[i] = vDistance
             
             # Now calculate the slope
             if hDistance == 0:    
@@ -271,25 +285,19 @@ class WorkOutAnalyzer:
         # Smooth the slopes
         self.slopes = SmoothData(self.slopes, 3)
     
-    def Process(self):
+    def CalculateExternalForces(self):
         self.ft = [0] * len(self.times)
         self.ff = [0] * len(self.times)
         self.fd = [0] * len(self.times)
         self.fs = [0] * len(self.times)
-        self.fr = [0] * len(self.times)
         for i in range(1, len(self.times)):
             speedIn = self.speeds[i-1]
             speedOut = self.speeds[i]
             intervalTime = self.times[i] - self.times[i-1]
             avgSpeed = (speedIn + speedOut) / 2 
-            vDistance = self.altitudes[i] - self.altitudes[i-1]
+            vDistance = self.vDistances[i]
             distance = self.distances[i]
-            if abs(vDistance) > abs(distance):
-                print 'Unexpected horizontal distance greater than total distance!'
-                # I guess this would be dropping :)
-                hDistance = 0
-            else:
-                hDistance = math.sqrt(distance * distance - vDistance * vDistance)
+            hDistance = math.sqrt(distance * distance - vDistance * vDistance)
             #print 'sIn = %.2f, sOut = %.2f, sAvg = %.2f, iTime = %.2f, dist = %.3f, vDist = %.3f, hDist = %.3f' % (speedIn, speedOut, avgSpeed, intervalTime, distance, vDistance, hDistance)
             # Calculate total force Ft from change in momentum
             Ft = self.staticData.weight * (speedOut - speedIn) / intervalTime
@@ -299,22 +307,53 @@ class WorkOutAnalyzer:
             self.ff[i] = Ff
             Fd = ForceOfDrag(self.staticData, avgSpeed)
             self.fd[i] = Fd
-            Fs = self.staticData.weight * ACCEL_OF_GRAVITY * vDistance / distance
+            if distance > 0:
+                Fs = self.staticData.weight * ACCEL_OF_GRAVITY * vDistance / distance
+            else:
+                Fs = 0
             self.fs[i] = Fs
-            # Caclulate rider force
-            Fr = Ft + (Ff + Fd + Fs)
-            self.fr[i] = Fr
-            #print 'Ft = %.2f, Ff = %.2f, Fd = %.2f, Fs = %.2f, Fr = %.2f' % (Ft, Ff, Fd, Fs, Fr)
+
+    def CalculateRiderForce(self):
+        self.fr = [0] * len(self.times)
+        for i in range(1, len(self.times)):
+            self.fr[i] = self.ft[i] + (self.ff[i] + self.fd[i] + self.fs[i])
+        
+    def CalculateWorkAndPower(self):
+        self.power = [0] * len(self.times)
+        for i in range(1, len(self.times)):
+            self.power[i] = self.fr[i] * self.speeds[i]
+        
+    def Process(self):
+        self.CalculateExternalForces()
+        
+        # Smooth the forces
+        #self.fd = SmoothData(self.fd, 3)
+        #self.ft = SmoothData(self.ft, 3)
+        #self.fs = SmoothData(self.fs, 3)
+        #self.ff = SmoothData(self.ff, 3)
+        
+        #self.fr = SmoothData(self.fr, 3)
+        
+        self.CalculateRiderForce()
+        
+        self.CalculateWorkAndPower()
     
     def PostProcess(self):
+        # Smooth the power
+        self.power = SmoothData(self.power, 5)
+        
         mp = MuliPlotter(10000)
         
-        #mp.AddPlot(PlotData("speed", self.times, self.speeds))
+        mp.AddPlot(PlotData("speed", self.times, self.speeds))
         mp.AddPlot(PlotData("altitude", self.times, self.altitudes))
-        mp.AddPlot(PlotData("distance", self.times, self.distances))
+        #mp.AddPlot(PlotData("distance", self.times, self.distances))
         #mp.AddPlot(PlotData("total force", self.times, self.ft))
-        mp.AddPlot(PlotData("slope", self.times, self.slopes))
+        #mp.AddPlot(PlotData("slope", self.times, self.slopes))
         #mp.AddPlot(PlotData("slope force", self.times, self.fs))
+        #mp.AddPlot(PlotData("drag", self.times, self.fd))
+        #mp.AddPlot(PlotData("Fr", self.times, self.ft))
+        #mp.AddPlot(PlotData("Ft", self.times, self.fr))
+        mp.AddPlot(PlotData("power", self.times, self.power))
         
         mp.Plot()
         sys.exit(0)
