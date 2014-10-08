@@ -174,6 +174,8 @@ class PlotData:
         # Always scale normalized data from 0 to yResolution
         base = self.min
         yRange = self.yRange()
+        if yRange == 0:
+            yRange = yResolution
         newYData = [0] * len(self.ydata)
         for i in range(len(self.ydata)):
             newYData[i] = (self.ydata[i] - base) * yResolution / yRange
@@ -213,6 +215,30 @@ class MuliPlotter:
         wait('Press Enter')
 
 
+def GetValueAtTime(values, times, t):
+    for i in range(len(values)):
+        if t >= times[i]:
+            if t == times[i] or i == len(times) - 1 or t > times[i+1]:
+                return values[i]
+            timeSpan = float(times[i+1] - times[i])
+            valueSpan = float(values[i+1] - values[i])
+            return values[i] + valueSpan * (t - times[i]) / timeSpan
+    return 0
+
+def Mean(data):
+    sum = 0
+    for d in data:
+        sum += d
+    return sum / len(data)
+
+def Sdev(data):
+    m = Mean(data)
+    acum = 0
+    for d in data:
+        dif = d - m;
+        acum += d * d
+    return math.sqrt(acum / len(data))             
+
 class WorkOutAnalyzer:
     def __init__(self, staticData, times, distances, altitudes, heartRates):
         self.staticData = staticData
@@ -228,6 +254,8 @@ class WorkOutAnalyzer:
     
     def PreProcess(self):
         # Smooth sensor data
+        if len(self.times) < 2 or len(self.altitudes) < len(self.times):
+            return
         self.altitudes = SmoothData(self.altitudes, 3)
         self.heartRates = SmoothData(self.heartRates, 3)
         self.distances = SmoothData(self.distances, 3)
@@ -272,8 +300,6 @@ class WorkOutAnalyzer:
                 self.slopes[i] = 0  # To avoid divide by zerp
             else:
                 slope = math.atan(vDistance / hDistance)
-                if slope > 0.2 or slope < -0.15:
-                    print '%.4f / %.4f' % (vDistance, hDistance)
                 self.slopes[i] = slope
 
             lastTime = self.times[i]
@@ -351,7 +377,15 @@ class WorkOutAnalyzer:
     
     def PostProcess(self):
         # Smooth the power
-        self.power = SmoothData(self.power, 5)
+        #self.power = SmoothData(self.power, 5)
+        
+        #self.CalcHRPowerFactor(30)
+        
+        #self.FindTimeSkew()
+        
+        self.power = SmoothData(self.power, 31)
+        self.heartRates = SmoothData(self.heartRates, 31)
+        self.speeds = SmoothData(self.speeds, 31)
         
         mp = MuliPlotter(10000)
         
@@ -365,12 +399,53 @@ class WorkOutAnalyzer:
         #mp.AddPlot(PlotData("Fr", self.times, self.ft))
         #mp.AddPlot(PlotData("Ft", self.times, self.fr))
         mp.AddPlot(PlotData("power", self.times, self.power))
-        mp.AddPlot(PlotData("work", self.times, self.joulesCum))
+        #mp.AddPlot(PlotData("work", self.times, self.joulesCum))
+        mp.AddPlot(PlotData("hr", self.times, self.heartRates))
+        #mp.AddPlot(PlotData("pwr/hr", self.times, self.hrpw))
+        #mp.AddPlot(PlotData("pwr skewed", self.powerTime, self.power))
         
-        mp.Plot()
-        sys.exit(0)
-        
+        #mp.Plot()
+        #sys.exit(0)
     
+    def CalcHRPowerFactor(self, timeSkew):
+        self.hrpw = [0] * len(self.times)
+        self.powerTime = self.times[:]
+        for i in range(len(self.powerTime)):
+            self.powerTime[i] += timeSkew
+
+        startIdx = None
+        for i in range(len(self.times)):
+            t = self.times[i]
+            if t >= timeSkew:
+                if not startIdx:
+                    #print '%.4f > %d' % (t, timeSkew)
+                    startIdx = i
+                power = GetValueAtTime(self.power, self.powerTime, t)
+                hr = self.heartRates[i]
+                self.hrpw[i] = power / hr
+            else:
+                self.hrpw[i] = 0
+        #print self.times[:10]
+        #print '%d -> %d' % (timeSkew, startIdx)
+        return startIdx
+    
+    def FindTimeSkew(self):
+        smallestSdev = None
+        smallestSdevAt = None
+        for s in range(0, 91):
+            startIdx = self.CalcHRPowerFactor(s)
+            sdev = Sdev(self.hrpw[startIdx:])
+            print '%d => %.5f' % (s, sdev)
+            if not smallestSdev:
+                smallestSdev = sdev
+                smallestSdevAt = s
+            elif sdev < smallestSdev:
+                smallestSdev = sdev
+                smallestSdevAt = s
+        print 'Skew seems to be %d' % smallestSdevAt
+        self.CalcHRPowerFactor(smallestSdevAt)
+                
+            
 class LapInfo:
     def __init__(self, lapXml):
         
@@ -444,96 +519,38 @@ class LapInfo:
     
     def Dump(self):
         staticData = StaticData(88.0, COEFF_FRIC_MTB, 0.5)
-        print '    Reported Data:'
-        print '      Total time = %f' % self.reportedTotalTime
-        print '      Total distance = %f' % self.reportedDistance
-        print '      Max Speed = %f %f mph' % (self.reportedMaxSpeed, 2.23694 * self.reportedMaxSpeed)
-        print '      Avg HR = %d' % self.reportedAvgHearRate
-        print '      Max HR = %d' % self.reportedMaxHearRate
-        print '      Calories = %.f' % self.reportedCalories
-        print '    Calculated Data:'
-        print '      Total time = %f' % (self.lastTime - self.startTime)
-        print '      Total distance = %f' % self.lastDistance
-        print '      Max Speed = %f %f mph (%.2f%% error)' % (self.maxSpeed, 2.23694 * self.maxSpeed, ErrorPercent(self.reportedMaxSpeed, self.maxSpeed))
-        print '      Avg HR = %d (%.2f%% error)' % (int(round(self.avgHeartRate)), ErrorPercent(round(self.reportedAvgHearRate), round(self.avgHeartRate)))
-        print '      Max HR = %d' % self.maxHeartRate
-        print '      Joules = %.1f' % self.joules
-        print '      Joules / Calories = %f' % (self.joules / self.reportedCalories)
+        #print '    Reported Data:'
+        #print '      Total time = %f' % self.reportedTotalTime
+        #print '      Total distance = %f' % self.reportedDistance
+        #print '      Max Speed = %f %f mph' % (self.reportedMaxSpeed, 2.23694 * self.reportedMaxSpeed)
+        #print '      Avg HR = %d' % self.reportedAvgHearRate
+        #print '      Max HR = %d' % self.reportedMaxHearRate
+        #print '      Calories = %.f' % self.reportedCalories
+        #print '    Calculated Data:'
+        #print '      Total time = %f' % (self.lastTime - self.startTime)
+        #print '      Total distance = %f' % self.lastDistance
+        #print '      Max Speed = %f %f mph (%.2f%% error)' % (self.maxSpeed, 2.23694 * self.maxSpeed, ErrorPercent(self.reportedMaxSpeed, self.maxSpeed))
+        #print '      Avg HR = %d (%.2f%% error)' % (int(round(self.avgHeartRate)), ErrorPercent(round(self.reportedAvgHearRate), round(self.avgHeartRate)))
+        #print '      Max HR = %d' % self.maxHeartRate
+        #print '      Joules = %.1f' % self.joules
+        print '               Joules / Calories = %f' % (self.joules / self.reportedCalories if self.reportedCalories > 0 else 0)
         joulesAscending = CalcWork(staticData, self.ascendingMeters, self.metersAscended, self.timeAscending)
         joulesDescending = CalcWork(staticData, self.descendingMeters, -self.metersDescended, self.timeDescending)
         totalJoules = joulesAscending
         if  joulesDescending > 0:
             totalJoules += joulesDescending
-        print '      Meters ascended  = %.1f in %.1f meters %.1f seconds = %.1f joules' % (self.metersAscended, self.ascendingMeters, self.timeAscending, joulesAscending) 
-        print '      Meters descended = %.1f in %.1f meters %.1f seconds = %.1f joules' % (self.metersDescended, self.descendingMeters, self.timeDescending, joulesDescending)
-        print '      Total joules = %f, joules / calories = %f' % (totalJoules, totalJoules / self.reportedCalories)
-        wa = WorkOutAnalyzer(staticData, self.times, self.distances, self.altitudes, self.heartRates)
-        wa.Analyze()
+        #print '      Meters ascended  = %.1f in %.1f meters %.1f seconds = %.1f joules' % (self.metersAscended, self.ascendingMeters, self.timeAscending, joulesAscending) 
+        #print '      Meters descended = %.1f in %.1f meters %.1f seconds = %.1f joules' % (self.metersDescended, self.descendingMeters, self.timeDescending, joulesDescending)
+        #print '      Total joules = %f, joules / calories = %f' % (totalJoules, totalJoules / self.reportedCalories)
+        if len(self.times) > 2:
+            wa = WorkOutAnalyzer(staticData, self.times, self.distances, self.altitudes, self.heartRates)
+            wa.Analyze()
+            #print '      Analyzer joules = %f' % wa.joules
+            print '      Analyzer joules / Calories = %f' % (wa.joules / self.reportedCalories if self.reportedCalories > 0 else 0)
+            print '                        Calories = %f' % self.reportedCalories
+            print '                     My Calories = %f' % (wa.joules / 640)
         #sys.exit(0)
     
-    def Plot(self):
-        
-        self.powers = SmoothData(self.powers, 15)
-        self.speeds = SmoothData(self.speeds, 15)
-        
-        g = Gnuplot.Gnuplot(debug=1)
-        g.clear()
-        filename1 = tempfile.mktemp()
-        f = open(filename1, 'w')
-        filename2 = tempfile.mktemp()
-        f2 = open(filename2, 'w')
-        filename3 = tempfile.mktemp()
-        f3 = open(filename3, 'w')
-        filename4 = tempfile.mktemp()
-        f4 = open(filename4, 'w')
-        try:
-            for i in range(len(self.times)):
-                f.write('%s %s\n' % (self.times[i], self.altitudes[i]))
-            f.close()
-
-            for i in range(len(self.times)):
-                f2.write('%s %s\n' % (self.times[i], self.speeds[i]))
-            f2.close()
-
-            for i in range(len(self.times)):
-                f3.write('%s %s\n' % (self.times[i], self.heartRates[i]))
-            f3.close()
-
-            for i in range(len(self.times)):
-                f4.write('%s %s\n' % (self.times[i], self.powers[i]))
-            f4.close()
-
-            g.xlabel('time (seconds)')
-            
-            #g("set yrange [1670:1800]")
-            #g("set ytics 100 nomirror tc lt 1")
-            #g("set ylabel 'altitude' tc lt 1")
-
-            #g("set y2range [0:10]")
-            #g("set y2tics 5 nomirror tc lt 2")
-            #g("set y2label 'speed' tc lt 2")
-            
-            g('set multiplot')
-                        
-            g.plot(Gnuplot.File(filename1, with_='lines linecolor 1'))
-            g.plot(Gnuplot.File(filename2, with_='lines linecolor 2'))
-            g("set yrange [0:200]")
-            g.plot(Gnuplot.File(filename3, with_='lines linecolor 3'))
-            g("set yrange [0:300]")
-            g.plot(Gnuplot.File(filename4, with_='lines linecolor 4'))
-            
-            g('unset multiplot')
-            #g.plot(Gnuplot.File(filename1, with_='linetype 1'),
-            #       Gnuplot.File(filename2, with_='linetype 2'))
-            wait('Set title and axis labels and try replot()')
-    
-        finally:
-            os.unlink(filename1)
-            os.unlink(filename2)
-            os.unlink(filename3)
-            os.unlink(filename4)
-            
-        
     def ProcessTrackPoint(self, trackPoint, activityStartTime, stopTime):
         activityTimeElapsed = trackPoint.time - activityStartTime
         if stopTime != 0 and activityTimeElapsed > stopTime:
