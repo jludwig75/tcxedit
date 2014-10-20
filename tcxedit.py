@@ -26,7 +26,9 @@ DRAG_COEFFICIENT = 0.5
 COEFF_FRIC_MTB = 0.015
 COEFF_FRIC_ROAD = 0.06
 
-GAUSSIAN_SMOOT_SDEV = 1.0
+GAUSSIAN_SMOOT_SDEV = float(1.0)
+GAUSSIAN_SMOOT_SECONDARY_DATA = float(2.0)
+GAUSSIAN_SMOOT_TERTIARY_DATA = float(2.5)
 
 class StaticData:
     def __init__(self, weight, friction, frontalArea):
@@ -322,9 +324,9 @@ class WorkOutAnalyzer:
             lastAltitude = self.altitudes[i]
         
         # Smooth the speeds
-        self.speeds = SmoothData(self.speeds, GAUSSIAN_SMOOT_SDEV)
+        self.speeds = SmoothData(self.speeds, GAUSSIAN_SMOOT_SECONDARY_DATA)
         # Smooth the slopes
-        self.slopes = SmoothData(self.slopes, GAUSSIAN_SMOOT_SDEV)
+        self.slopes = SmoothData(self.slopes, GAUSSIAN_SMOOT_SECONDARY_DATA)
     
     def CalculateExternalForces(self):
         self.ft = [0] * len(self.times)
@@ -379,12 +381,12 @@ class WorkOutAnalyzer:
         self.CalculateExternalForces()
         
         # Smooth the forces
-        #self.fd = SmoothData(self.fd, GAUSSIAN_SMOOT_SDEV)
-        #self.ft = SmoothData(self.ft, GAUSSIAN_SMOOT_SDEV)
-        #self.fs = SmoothData(self.fs, GAUSSIAN_SMOOT_SDEV)
-        #self.ff = SmoothData(self.ff, GAUSSIAN_SMOOT_SDEV)
+        #self.fd = SmoothData(self.fd, GAUSSIAN_SMOOT_SECONDARY_DATA)
+        #self.ft = SmoothData(self.ft, GAUSSIAN_SMOOT_SECONDARY_DATA)
+        #self.fs = SmoothData(self.fs, GAUSSIAN_SMOOT_SECONDARY_DATA)
+        #self.ff = SmoothData(self.ff, GAUSSIAN_SMOOT_SECONDARY_DATA)
         
-        #self.fr = SmoothData(self.fr, GAUSSIAN_SMOOT_SDEV)
+        #self.fr = SmoothData(self.fr, GAUSSIAN_SMOOT_SECONDARY_DATA)
         
         self.CalculateRiderForce()
         
@@ -392,7 +394,9 @@ class WorkOutAnalyzer:
     
     def PostProcess(self):
         # Smooth the power
-        self.power = SmoothData(self.power, GAUSSIAN_SMOOT_SDEV)
+        self.power = SmoothData(self.power, GAUSSIAN_SMOOT_TERTIARY_DATA)
+        for i in range(len(self.power) - 8, len(self.power)):
+            self.power[i] = 0
         
         #self.CalcHRPowerFactor(30)
         
@@ -404,9 +408,37 @@ class WorkOutAnalyzer:
         
         mp = MuliPlotter(10000)
         
-        mp.AddPlot(PlotData("hr", self.times, self.heartRates))
-        mp.AddPlot(PlotData("altitude", self.times, self.altitudes))
-        mp.AddPlot(PlotData("speed", self.times, self.speeds))
+        pedalingPower = [x if x > 0 else 0 for x in self.power]
+        
+        pedalingJoules = 0
+        timePedaling = 0
+        lastTime = 0
+        hrTime = 0
+        for i in range(len(pedalingPower)):
+            if pedalingPower[i] > 0:
+                elapsed = self.times[i] - lastTime
+                timePedaling += elapsed
+                pedalingJoules += elapsed * self.power[i]
+                hrTime += elapsed * self.heartRates[i]
+            lastTime = self.times[i]
+            
+        avgPedalingPower = pedalingJoules / timePedaling
+        avgHr = hrTime / timePedaling
+        
+        print 'Average power while pedaling = %.1f' % avgPedalingPower
+        print 'Average hr while pedaling = %.f bpm' % avgHr
+        print 'power / hr while pedaling = %.2f' % (avgPedalingPower / avgHr)
+        
+        pedalingPowerTrend = SmoothData(pedalingPower, 8.0)
+        hrTrend = SmoothData(self.heartRates, 8.0)
+        
+        #mp.AddPlot(PlotData("hr", self.times, self.heartRates))
+        #mp.AddPlot(PlotData("altitude", self.times, self.altitudes))
+        #mp.AddPlot(PlotData("speed", self.times, self.speeds))
+        #mp.AddPlot(PlotData("pedaling power", self.times, pedalingPower))
+        mp.AddPlot(PlotData("hr trend", self.times, hrTrend))
+        mp.AddPlot(PlotData("pedaling power trend", self.times, pedalingPowerTrend))
+        #mp.AddPlot(PlotData("power", self.times, self.power))
         #mp.AddPlot(PlotData("distance", self.times, self.distances))
         #mp.AddPlot(PlotData("total force", self.times, self.ft))
         #mp.AddPlot(PlotData("slope", self.times, self.slopes))
@@ -414,7 +446,6 @@ class WorkOutAnalyzer:
         #mp.AddPlot(PlotData("drag", self.times, self.fd))
         #mp.AddPlot(PlotData("Fr", self.times, self.ft))
         #mp.AddPlot(PlotData("Ft", self.times, self.fr))
-        #mp.AddPlot(PlotData("power", self.times, self.power))
         #mp.AddPlot(PlotData("work", self.times, self.joulesCum))
         #mp.AddPlot(PlotData("pwr/hr", self.times, self.hrpw))
         #mp.AddPlot(PlotData("pwr skewed", self.powerTime, self.power))
