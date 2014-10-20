@@ -107,7 +107,7 @@ class TrackPointInfo:
         
         hrNode = trackPointXml.find(TAG_NAME('HeartRateBpm'))
         if hrNode is not None:
-            self.heartRate = int(hrNode.find(TAG_NAME('Value')).text)
+            self.heartRate = float(hrNode.find(TAG_NAME('Value')).text)
         else:
             self.heartRate = 0
 
@@ -377,15 +377,15 @@ class WorkOutAnalyzer:
     
     def PostProcess(self):
         # Smooth the power
-        #self.power = SmoothData(self.power, 5)
+        self.power = SmoothData(self.power, 5)
         
         #self.CalcHRPowerFactor(30)
         
         #self.FindTimeSkew()
         
-        self.power = SmoothData(self.power, 31)
-        self.heartRates = SmoothData(self.heartRates, 31)
-        self.speeds = SmoothData(self.speeds, 31)
+        #self.power = SmoothData(self.power, 31)
+        #self.heartRates = SmoothData(self.heartRates, 31)
+        #self.speeds = SmoothData(self.speeds, 31)
         
         mp = MuliPlotter(10000)
         
@@ -404,7 +404,7 @@ class WorkOutAnalyzer:
         #mp.AddPlot(PlotData("pwr/hr", self.times, self.hrpw))
         #mp.AddPlot(PlotData("pwr skewed", self.powerTime, self.power))
         
-        #mp.Plot()
+        mp.Plot()
         #sys.exit(0)
     
     def CalcHRPowerFactor(self, timeSkew):
@@ -449,6 +449,18 @@ class WorkOutAnalyzer:
 class LapInfo:
     def __init__(self, lapXml):
         
+        self.StoreReportedData(lapXml)
+        
+        self.lastTime = 0
+        self.startTime = 0
+        self.lastDistance = 0
+        
+        self.times = []
+        self.altitudes = []
+        self.heartRates = []
+        self.distances = []
+    
+    def StoreReportedData(self, lapXml):
         self.lapXml = lapXml
         
         self.reportedTotalTime = float(lapXml.find(TAG_NAME('TotalTimeSeconds')).text)
@@ -465,36 +477,6 @@ class LapInfo:
             self.reportedMaxHearRate = int(maxHrNode.find(TAG_NAME('Value')).text)
         else:
             self.reportedMaxHearRate = 0
-        
-        self.lastTime = 0
-        self.startTime = 0
-        self.timeElapsed = 0
-        self.totalDistance = 0
-        self.maxSpeed = 0
-        self.avgHeartRate = 0
-        self.maxHeartRate = 0
-        self.dataPoints = 0
-        self.calories = 0
-        self.lastDistance = 0
-        self.lastPositiion = None
-        self.calculatedDistance = 0
-        self.gpsDistance = 0
-        self.lastPositionAnywhere = None
-        self.lastAltitude = 0
-        self.metersAscended = 0
-        self.metersDescended = 0
-        self.timeAscending = 0
-        self.timeDescending = 0
-        self.ascendingMeters = 0
-        self.descendingMeters = 0
-        self.joules = 0
-        
-        self.times = []
-        self.altitudes = []
-        self.heartRates = []
-        self.distances = []
-        self.speeds = []
-        self.powers = []
     
     def UpdateLapStats(self):
         self.lapXml.find(TAG_NAME('TotalTimeSeconds')).text = '%.7f' % self.GetTotalRecordedTime()
@@ -519,37 +501,13 @@ class LapInfo:
     
     def Dump(self):
         staticData = StaticData(88.0, COEFF_FRIC_MTB, 0.5)
-        #print '    Reported Data:'
-        #print '      Total time = %f' % self.reportedTotalTime
-        #print '      Total distance = %f' % self.reportedDistance
-        #print '      Max Speed = %f %f mph' % (self.reportedMaxSpeed, 2.23694 * self.reportedMaxSpeed)
-        #print '      Avg HR = %d' % self.reportedAvgHearRate
-        #print '      Max HR = %d' % self.reportedMaxHearRate
-        #print '      Calories = %.f' % self.reportedCalories
-        #print '    Calculated Data:'
-        #print '      Total time = %f' % (self.lastTime - self.startTime)
-        #print '      Total distance = %f' % self.lastDistance
-        #print '      Max Speed = %f %f mph (%.2f%% error)' % (self.maxSpeed, 2.23694 * self.maxSpeed, ErrorPercent(self.reportedMaxSpeed, self.maxSpeed))
-        #print '      Avg HR = %d (%.2f%% error)' % (int(round(self.avgHeartRate)), ErrorPercent(round(self.reportedAvgHearRate), round(self.avgHeartRate)))
-        #print '      Max HR = %d' % self.maxHeartRate
-        #print '      Joules = %.1f' % self.joules
-        print '               Joules / Calories = %f' % (self.joules / self.reportedCalories if self.reportedCalories > 0 else 0)
-        joulesAscending = CalcWork(staticData, self.ascendingMeters, self.metersAscended, self.timeAscending)
-        joulesDescending = CalcWork(staticData, self.descendingMeters, -self.metersDescended, self.timeDescending)
-        totalJoules = joulesAscending
-        if  joulesDescending > 0:
-            totalJoules += joulesDescending
-        #print '      Meters ascended  = %.1f in %.1f meters %.1f seconds = %.1f joules' % (self.metersAscended, self.ascendingMeters, self.timeAscending, joulesAscending) 
-        #print '      Meters descended = %.1f in %.1f meters %.1f seconds = %.1f joules' % (self.metersDescended, self.descendingMeters, self.timeDescending, joulesDescending)
-        #print '      Total joules = %f, joules / calories = %f' % (totalJoules, totalJoules / self.reportedCalories)
+
         if len(self.times) > 2:
             wa = WorkOutAnalyzer(staticData, self.times, self.distances, self.altitudes, self.heartRates)
             wa.Analyze()
-            #print '      Analyzer joules = %f' % wa.joules
             print '      Analyzer joules / Calories = %f' % (wa.joules / self.reportedCalories if self.reportedCalories > 0 else 0)
             print '                        Calories = %f' % self.reportedCalories
             print '                     My Calories = %f' % (wa.joules / 640)
-        #sys.exit(0)
     
     def ProcessTrackPoint(self, trackPoint, activityStartTime, stopTime):
         activityTimeElapsed = trackPoint.time - activityStartTime
@@ -558,76 +516,17 @@ class LapInfo:
             return False
         if 0 == self.startTime:
             self.startTime = trackPoint.time
-            self.avgHeartRate = trackPoint.heartRate
         else:
             elapsed = trackPoint.time - self.startTime
-            intervalTime = trackPoint.time - self.lastTime
             intervalDistance = trackPoint.distance - self.lastDistance
-            vDistance = trackPoint.altitude - self.lastAltitude
-            if intervalDistance >= abs(vDistance):
-                hDistance = math.sqrt(intervalDistance * intervalDistance - vDistance * vDistance)
-            else:
-                hDistance = intervalDistance
-            
-            if vDistance >= 0:
-                self.ascendingMeters += intervalDistance
-                self.metersAscended += vDistance
-                self.timeAscending += intervalTime
-            else:
-                self.descendingMeters += intervalDistance
-                self.metersDescended -= vDistance
-                self.timeDescending += intervalTime
-                
-            staticData = StaticData(88.0, COEFF_FRIC_MTB, 0.5)
-            work = CalcWork(staticData, hDistance, vDistance, intervalTime)
-            if work > 0:
-                self.joules += work
-            
-            speed = intervalDistance / intervalTime
-            if speed > self.maxSpeed:
-                self.maxSpeed = speed
 
-            power = CalcForceOfMotion(staticData, hDistance, vDistance, intervalTime) * speed
             self.times.append(elapsed)
             self.heartRates.append(trackPoint.heartRate)
             self.altitudes.append(trackPoint.altitude)
             self.distances.append(intervalDistance)
-            self.speeds.append(speed)
-            self.powers.append(power if power > 0 else 0)
-            
-            if trackPoint.position and self.lastPositiion:
-                gpsIntervalDistance = trackPoint.position.Distance(self.lastPositiion)
-                gpsSpeed = gpsIntervalDistance / intervalTime
-                self.calculatedDistance += gpsIntervalDistance 
-            else:
-                gpsIntervalDistance = None
-                gpsSpeed = None
-                self.calculatedDistance += intervalDistance
-
-            if trackPoint.position and self.lastPositionAnywhere:
-                self.gpsDistance += trackPoint.position.Distance(self.lastPositionAnywhere)
-            
-            # Heart rate
-            if trackPoint.heartRate > self.maxHeartRate:
-                self.maxHeartRate = trackPoint.heartRate
-            
-            self.avgHeartRate = (self.avgHeartRate * (elapsed - intervalTime) + trackPoint.heartRate * intervalTime) / elapsed
-            
-            #print '      elapsed time = %f' % elapsed
-            #print '      interval time = %f' % intervalTime
-            #print '      interval distance = %f' % intervalDistance
-            #if gpsIntervalDistance is not None:
-            #    print '      GPS interval distance = %f, %.3f%% error' % (gpsIntervalDistance, ErrorPercent(intervalDistance, gpsIntervalDistance))
-            #    print '      GPS speed = %f' % (2.23694 * gpsSpeed)
-            #print '      avg HR = %f' % self.avgHeartRate
-            #print '      Speed = %f' % (2.23694 * speed)
         
         self.lastTime = trackPoint.time
         self.lastDistance = trackPoint.distance
-        self.lastPositiion = trackPoint.position
-        self.lastAltitude = trackPoint.altitude
-        if trackPoint.position:
-            self.lastPositionAnywhere = trackPoint.position
         
         return True
     
