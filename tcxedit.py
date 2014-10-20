@@ -26,7 +26,7 @@ DRAG_COEFFICIENT = 0.5
 COEFF_FRIC_MTB = 0.015
 COEFF_FRIC_ROAD = 0.06
 
-GAUSSIAN_SMOOT_SDEV = 2
+GAUSSIAN_SMOOT_SDEV = 1.0
 
 class StaticData:
     def __init__(self, weight, friction, frontalArea):
@@ -153,11 +153,10 @@ def BuildGaussianFilter(width, sdev):
     return filter
                 
 def SmoothData(dataArray, sdev):
-    filter = BuildGaussianFilter(2 * ((sdev * 10) / 2) + 1, sdev)#[1] * width
+    filter = BuildGaussianFilter(2 * ((int(sdev) * 10) / 2) + 1, sdev)#[1] * width
     filter_sum = 0
     for value in filter:
         filter_sum += value
-    print 'Filter = %s = %s' % (filter, filter_sum)
     return ApplyFilter(dataArray, filter, filter_sum)
 
 
@@ -405,8 +404,9 @@ class WorkOutAnalyzer:
         
         mp = MuliPlotter(10000)
         
-        mp.AddPlot(PlotData("speed", self.times, self.speeds))
+        mp.AddPlot(PlotData("hr", self.times, self.heartRates))
         mp.AddPlot(PlotData("altitude", self.times, self.altitudes))
+        mp.AddPlot(PlotData("speed", self.times, self.speeds))
         #mp.AddPlot(PlotData("distance", self.times, self.distances))
         #mp.AddPlot(PlotData("total force", self.times, self.ft))
         #mp.AddPlot(PlotData("slope", self.times, self.slopes))
@@ -414,9 +414,8 @@ class WorkOutAnalyzer:
         #mp.AddPlot(PlotData("drag", self.times, self.fd))
         #mp.AddPlot(PlotData("Fr", self.times, self.ft))
         #mp.AddPlot(PlotData("Ft", self.times, self.fr))
-        mp.AddPlot(PlotData("power", self.times, self.power))
+        #mp.AddPlot(PlotData("power", self.times, self.power))
         #mp.AddPlot(PlotData("work", self.times, self.joulesCum))
-        mp.AddPlot(PlotData("hr", self.times, self.heartRates))
         #mp.AddPlot(PlotData("pwr/hr", self.times, self.hrpw))
         #mp.AddPlot(PlotData("pwr skewed", self.powerTime, self.power))
         
@@ -594,18 +593,26 @@ class TcxVisitor:
             distances = []
             altitudes = []
             heartRates = []
+            reportedCalories = 0
             print 'Activity'
             totalActivityTime = 0.0
+            lastTime = 0
             for lap in activity.laps:
-                print '  Lap'
-                staticData = StaticData(88.0, COEFF_FRIC_MTB, 0.5)
-        
-                if len(lap.times) > 2:
-                    wa = WorkOutAnalyzer(staticData, lap.times, lap.distances, lap.altitudes, lap.heartRates)
-                    wa.Analyze()
-                    print '      Analyzer joules / Calories = %f' % (wa.joules / lap.reportedCalories if lap.reportedCalories > 0 else 0)
-                    print '                        Calories = %f' % lap.reportedCalories
-                    print '                     My Calories = %f' % (wa.joules / 640)
+                reportedCalories += lap.reportedCalories
+                tempTimes = [t + lastTime for t in lap.times]
+                times += tempTimes
+                distances += lap.distances
+                altitudes += lap.altitudes
+                heartRates += lap.heartRates
+                lastTime = times[-1]
+            staticData = StaticData(88.0, COEFF_FRIC_MTB, 0.5)
+    
+            if len(times) > 2:
+                wa = WorkOutAnalyzer(staticData, times, distances, altitudes, heartRates)
+                wa.Analyze()
+                print '      Analyzer joules / Calories = %f' % (wa.joules / reportedCalories if reportedCalories > 0 else 0)
+                print '                        Calories = %f' % reportedCalories
+                print '                     My Calories = %f' % (wa.joules / 640)
             print ' Total activity time = %.2f' % activity.totalTime
 
 
