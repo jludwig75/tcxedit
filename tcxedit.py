@@ -26,6 +26,8 @@ DRAG_COEFFICIENT = 0.5
 COEFF_FRIC_MTB = 0.015
 COEFF_FRIC_ROAD = 0.06
 
+GAUSSIAN_SMOOT_SDEV = 2
+
 class StaticData:
     def __init__(self, weight, friction, frontalArea):
         self.weight = weight
@@ -126,23 +128,37 @@ def ErrorPercent(actual, calculated):
         return 0
     return 100.0 * (float(calculated) - float(actual)) / float(actual)
 
-def ApplyFilter(data, filter):
+def ApplyFilter(data, filter, filter_sum):
     mid = len(filter) / 2
     new_data = [0] * len(data)
     for i in range(len(data)):
-        sum = 0
-        count = 0
-        for j in range(-mid, mid + 1):
-            idx = i + j
-            if idx >= 0 and idx < len(data):
-                sum += data[idx] * filter[mid + j]
-                count += 1
-        new_data[i] = sum / count
+        if i < mid or i > len(data) - mid:
+            new_data[i] = data[i]
+        else:
+            sum = 0
+            #count = 0
+            for j in range(-mid, mid + 1):
+                idx = i + j
+                if idx >= 0 and idx < len(data):
+                    sum += data[idx] * filter[mid + j]
+                #count += 1
+                new_data[i] = sum / filter_sum# / count
     return new_data
-            
-def SmoothData(dataArray, width):
-    filter = [1] * width
-    return ApplyFilter(dataArray, filter)
+
+def BuildGaussianFilter(width, sdev):
+    mid = width / 2
+    filter = [0] * width
+    for x in range(-mid, mid + 1):
+        filter[mid + x] = 1 / math.sqrt(2 * math.pi * sdev) * math.exp(-(x * x) / (2 * sdev * sdev))
+    return filter
+                
+def SmoothData(dataArray, sdev):
+    filter = BuildGaussianFilter(2 * ((sdev * 10) / 2) + 1, sdev)#[1] * width
+    filter_sum = 0
+    for value in filter:
+        filter_sum += value
+    print 'Filter = %s = %s' % (filter, filter_sum)
+    return ApplyFilter(dataArray, filter, filter_sum)
 
 
 class PlotData:
@@ -256,9 +272,9 @@ class WorkOutAnalyzer:
         # Smooth sensor data
         if len(self.times) < 2 or len(self.altitudes) < len(self.times):
             return
-        self.altitudes = SmoothData(self.altitudes, 3)
-        self.heartRates = SmoothData(self.heartRates, 3)
-        self.distances = SmoothData(self.distances, 3)
+        self.altitudes = SmoothData(self.altitudes, GAUSSIAN_SMOOT_SDEV)
+        self.heartRates = SmoothData(self.heartRates, GAUSSIAN_SMOOT_SDEV)
+        self.distances = SmoothData(self.distances, GAUSSIAN_SMOOT_SDEV)
         
         # Calculate speeds
         self.speeds = [0] * len(self.times)
@@ -307,9 +323,9 @@ class WorkOutAnalyzer:
             lastAltitude = self.altitudes[i]
         
         # Smooth the speeds
-        self.speeds = SmoothData(self.speeds, 3)
+        self.speeds = SmoothData(self.speeds, GAUSSIAN_SMOOT_SDEV)
         # Smooth the slopes
-        self.slopes = SmoothData(self.slopes, 3)
+        self.slopes = SmoothData(self.slopes, GAUSSIAN_SMOOT_SDEV)
     
     def CalculateExternalForces(self):
         self.ft = [0] * len(self.times)
@@ -364,12 +380,12 @@ class WorkOutAnalyzer:
         self.CalculateExternalForces()
         
         # Smooth the forces
-        #self.fd = SmoothData(self.fd, 3)
-        #self.ft = SmoothData(self.ft, 3)
-        #self.fs = SmoothData(self.fs, 3)
-        #self.ff = SmoothData(self.ff, 3)
+        #self.fd = SmoothData(self.fd, GAUSSIAN_SMOOT_SDEV)
+        #self.ft = SmoothData(self.ft, GAUSSIAN_SMOOT_SDEV)
+        #self.fs = SmoothData(self.fs, GAUSSIAN_SMOOT_SDEV)
+        #self.ff = SmoothData(self.ff, GAUSSIAN_SMOOT_SDEV)
         
-        #self.fr = SmoothData(self.fr, 3)
+        #self.fr = SmoothData(self.fr, GAUSSIAN_SMOOT_SDEV)
         
         self.CalculateRiderForce()
         
@@ -377,15 +393,15 @@ class WorkOutAnalyzer:
     
     def PostProcess(self):
         # Smooth the power
-        self.power = SmoothData(self.power, 5)
+        self.power = SmoothData(self.power, GAUSSIAN_SMOOT_SDEV)
         
         #self.CalcHRPowerFactor(30)
         
         #self.FindTimeSkew()
         
-        #self.power = SmoothData(self.power, 31)
-        #self.heartRates = SmoothData(self.heartRates, 31)
-        #self.speeds = SmoothData(self.speeds, 31)
+        #self.power = SmoothData(self.power, GAUSSIAN_SMOOT_SDEV)
+        #self.heartRates = SmoothData(self.heartRates, GAUSSIAN_SMOOT_SDEV)
+        #self.speeds = SmoothData(self.speeds, GAUSSIAN_SMOOT_SDEV)
         
         mp = MuliPlotter(10000)
         
@@ -574,12 +590,22 @@ class TcxVisitor:
             
     def Dump(self):
         for activity in self.activities:
+            times = []
+            distances = []
+            altitudes = []
+            heartRates = []
             print 'Activity'
             totalActivityTime = 0.0
             for lap in activity.laps:
                 print '  Lap'
-                lap.Dump()
-                #lap.Plot()
+                staticData = StaticData(88.0, COEFF_FRIC_MTB, 0.5)
+        
+                if len(lap.times) > 2:
+                    wa = WorkOutAnalyzer(staticData, lap.times, lap.distances, lap.altitudes, lap.heartRates)
+                    wa.Analyze()
+                    print '      Analyzer joules / Calories = %f' % (wa.joules / lap.reportedCalories if lap.reportedCalories > 0 else 0)
+                    print '                        Calories = %f' % lap.reportedCalories
+                    print '                     My Calories = %f' % (wa.joules / 640)
             print ' Total activity time = %.2f' % activity.totalTime
 
 
