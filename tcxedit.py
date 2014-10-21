@@ -26,7 +26,8 @@ DRAG_COEFFICIENT = 0.5
 COEFF_FRIC_MTB = 0.015
 COEFF_FRIC_ROAD = 0.06
 
-GAUSSIAN_SMOOT_SDEV = float(1.0)
+MAX_FILTER_WIDTH = 301
+GAUSSIAN_SMOOTH_SDEV = float(1.0)
 GAUSSIAN_SMOOT_SECONDARY_DATA = float(2.0)
 GAUSSIAN_SMOOT_TERTIARY_DATA = float(2.5)
 
@@ -148,6 +149,8 @@ def ApplyFilter(data, filter, filter_sum):
     return new_data
 
 def BuildGaussianFilter(width, sdev):
+    if width > MAX_FILTER_WIDTH:
+        width = MAX_FILTER_WIDTH
     mid = width / 2
     filter = [0] * width
     for x in range(-mid, mid + 1):
@@ -273,9 +276,9 @@ class WorkOutAnalyzer:
         # Smooth sensor data
         if len(self.times) < 2 or len(self.altitudes) < len(self.times):
             return
-        self.altitudes = SmoothData(self.altitudes, GAUSSIAN_SMOOT_SDEV)
-        self.heartRates = SmoothData(self.heartRates, GAUSSIAN_SMOOT_SDEV)
-        self.distances = SmoothData(self.distances, GAUSSIAN_SMOOT_SDEV)
+        self.altitudes = SmoothData(self.altitudes, GAUSSIAN_SMOOTH_SDEV)
+        self.heartRates = SmoothData(self.heartRates, GAUSSIAN_SMOOTH_SDEV)
+        self.distances = SmoothData(self.distances, GAUSSIAN_SMOOTH_SDEV)
         
         # Calculate speeds
         self.speeds = [0] * len(self.times)
@@ -402,9 +405,9 @@ class WorkOutAnalyzer:
         
         #self.FindTimeSkew()
         
-        #self.power = SmoothData(self.power, GAUSSIAN_SMOOT_SDEV)
-        #self.heartRates = SmoothData(self.heartRates, GAUSSIAN_SMOOT_SDEV)
-        #self.speeds = SmoothData(self.speeds, GAUSSIAN_SMOOT_SDEV)
+        #self.power = SmoothData(self.power, GAUSSIAN_SMOOTH_SDEV)
+        #self.heartRates = SmoothData(self.heartRates, GAUSSIAN_SMOOTH_SDEV)
+        #self.speeds = SmoothData(self.speeds, GAUSSIAN_SMOOTH_SDEV)
         
         mp = MuliPlotter(10000)
         
@@ -422,20 +425,16 @@ class WorkOutAnalyzer:
                 hrTime += elapsed * self.heartRates[i]
             lastTime = self.times[i]
             
-        avgPedalingPower = pedalingJoules / timePedaling
-        avgHr = hrTime / timePedaling
+        self.avgPedalingPower = pedalingJoules / timePedaling
+        self.avgHr = hrTime / timePedaling
         
-        print 'Average power while pedaling = %.1f' % avgPedalingPower
-        print 'Average hr while pedaling = %.f bpm' % avgHr
-        print 'power / hr while pedaling = %.2f' % (avgPedalingPower / avgHr)
+        pedalingPowerTrend = SmoothData(pedalingPower, 200.0)
+        hrTrend = SmoothData(self.heartRates, 200.0)
         
-        pedalingPowerTrend = SmoothData(pedalingPower, 8.0)
-        hrTrend = SmoothData(self.heartRates, 8.0)
-        
-        #mp.AddPlot(PlotData("hr", self.times, self.heartRates))
-        #mp.AddPlot(PlotData("altitude", self.times, self.altitudes))
-        #mp.AddPlot(PlotData("speed", self.times, self.speeds))
-        #mp.AddPlot(PlotData("pedaling power", self.times, pedalingPower))
+        mp.AddPlot(PlotData("hr", self.times, self.heartRates))
+        mp.AddPlot(PlotData("altitude", self.times, self.altitudes))
+        mp.AddPlot(PlotData("speed", self.times, self.speeds))
+        mp.AddPlot(PlotData("pedaling power", self.times, pedalingPower))
         mp.AddPlot(PlotData("hr trend", self.times, hrTrend))
         mp.AddPlot(PlotData("pedaling power trend", self.times, pedalingPowerTrend))
         #mp.AddPlot(PlotData("power", self.times, self.power))
@@ -551,9 +550,12 @@ class LapInfo:
         if len(self.times) > 2:
             wa = WorkOutAnalyzer(staticData, self.times, self.distances, self.altitudes, self.heartRates)
             wa.Analyze()
-            print '      Analyzer joules / Calories = %f' % (wa.joules / self.reportedCalories if self.reportedCalories > 0 else 0)
-            print '                        Calories = %f' % self.reportedCalories
-            print '                     My Calories = %f' % (wa.joules / 640)
+            print '  Average power while pedaling = %.1f' % wa.avgPedalingPower
+            print '     Average hr while pedaling = %.f bpm' % wa.avgHr
+            print '     power / hr while pedaling = %.2f' % (wa.avgPedalingPower / wa.avgHr)
+            print '    Analyzer joules / Calories = %f' % (wa.joules / self.reportedCalories if self.reportedCalories > 0 else 0)
+            print '                      Calories = %f' % self.reportedCalories
+            print '                   My Calories = %f' % (wa.joules / 640)
     
     def ProcessTrackPoint(self, trackPoint, activityStartTime, stopTime):
         activityTimeElapsed = trackPoint.time - activityStartTime
@@ -578,7 +580,8 @@ class LapInfo:
     
 
 class Activity:
-    def __init__(self):
+    def __init__(self, activityXml):
+        self.id = activityXml.find(TAG_NAME('Id')).text
         self.laps = []
         self.totalTime = 0
     
@@ -604,7 +607,7 @@ class TcxVisitor:
     
     def VisitActivity(self, activityXml):
         self.lastActivityStartTime = 0
-        self.currentActivity = Activity()
+        self.currentActivity = Activity(activityXml)
     
     def VisitLap(self, lapXml):
         self.currentLap = LapInfo(lapXml)
@@ -625,7 +628,8 @@ class TcxVisitor:
             altitudes = []
             heartRates = []
             reportedCalories = 0
-            print 'Activity'
+            print 'Activity %s' % activity.id
+            #print activity.id,
             totalActivityTime = 0.0
             lastTime = 0
             for lap in activity.laps:
@@ -641,10 +645,14 @@ class TcxVisitor:
             if len(times) > 2:
                 wa = WorkOutAnalyzer(staticData, times, distances, altitudes, heartRates)
                 wa.Analyze()
-                print '      Analyzer joules / Calories = %f' % (wa.joules / reportedCalories if reportedCalories > 0 else 0)
-                print '                        Calories = %f' % reportedCalories
-                print '                     My Calories = %f' % (wa.joules / 640)
-            print ' Total activity time = %.2f' % activity.totalTime
+                #print ', %.3f' % (wa.avgPedalingPower / wa.avgHr)
+                print '  Average power while pedaling = %.1f' % wa.avgPedalingPower
+                print '     Average hr while pedaling = %.f bpm' % wa.avgHr
+                print '     power / hr while pedaling = %.2f' % (wa.avgPedalingPower / wa.avgHr)
+                print '    Analyzer joules / Calories = %f' % (wa.joules / lap.reportedCalories if lap.reportedCalories > 0 else 0)
+                print '                      Calories = %f' % lap.reportedCalories
+                print '                   My Calories = %f' % (wa.joules / 640)
+            print     '           Total activity time = %.2f' % activity.totalTime
 
 
 def VisitTack(root, visitor):
