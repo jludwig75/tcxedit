@@ -26,7 +26,7 @@ DRAG_COEFFICIENT = 0.5
 COEFF_FRIC_MTB = 0.015
 COEFF_FRIC_ROAD = 0.06
 
-MAX_FILTER_WIDTH = 301
+MAX_FILTER_WIDTH = 31
 GAUSSIAN_SMOOTH_SDEV = float(1.0)
 GAUSSIAN_SMOOT_SECONDARY_DATA = float(2.0)
 GAUSSIAN_SMOOT_TERTIARY_DATA = float(2.5)
@@ -428,8 +428,10 @@ class WorkOutAnalyzer:
         self.avgPedalingPower = pedalingJoules / timePedaling
         self.avgHr = hrTime / timePedaling
         
-        pedalingPowerTrend = SmoothData(pedalingPower, 200.0)
-        hrTrend = SmoothData(self.heartRates, 200.0)
+        pedalingPowerTrend = SmoothData(pedalingPower, 20.0)
+        hrTrend = SmoothData(self.heartRates, 20.0)
+        
+        pwrToHr = [pedalingPowerTrend[i] / hrTrend[i] for i in range(len(self.times))]
         
         mp.AddPlot(PlotData("hr", self.times, self.heartRates))
         mp.AddPlot(PlotData("altitude", self.times, self.altitudes))
@@ -437,6 +439,7 @@ class WorkOutAnalyzer:
         mp.AddPlot(PlotData("pedaling power", self.times, pedalingPower))
         mp.AddPlot(PlotData("hr trend", self.times, hrTrend))
         mp.AddPlot(PlotData("pedaling power trend", self.times, pedalingPowerTrend))
+        mp.AddPlot(PlotData("power to HR", self.times[MAX_FILTER_WIDTH / 2:-MAX_FILTER_WIDTH / 2], pwrToHr[MAX_FILTER_WIDTH / 2:-MAX_FILTER_WIDTH / 2]))
         #mp.AddPlot(PlotData("power", self.times, self.power))
         #mp.AddPlot(PlotData("distance", self.times, self.distances))
         #mp.AddPlot(PlotData("total force", self.times, self.ft))
