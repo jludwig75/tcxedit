@@ -1,0 +1,282 @@
+  Lap
+                        Calories = 464.000000
+                     My Calories = 419.566701
+  Lap
+                        Calories = 77.000000
+                     My Calories = 60.770420
+  Lap
+                        Calories = 462.000000
+                     My Calories = 450.630392
+  Lap
+                        Calories = 615.000000
+                     My Calories = 656.501735
+  Lap
+                        Calories = 299.000000
+                     My Calories = 276.514688
+  Lap
+                        Calories = 99.000000
+                     My Calories = 88.981668
+  Lap
+                        Calories = 869.000000
+                     My Calories = 626.034367
+  Lap
+                        Calories = 259.000000
+                     My Calories = 241.159773
+  Lap
+                        Calories = 276.000000
+                     My Calories = 242.149497
+  Lap
+                        Calories = 490.000000
+                     My Calories = 471.631932
+  Lap
+                        Calories = 587.000000
+                     My Calories = 513.486037
+  Lap
+                        Calories = 148.000000
+                     My Calories = 110.845083
+  Lap
+                        Calories = 204.000000
+                     My Calories = 197.196630
+  Lap
+                        Calories = 293.000000
+                     My Calories = 276.728992
+  Lap
+                        Calories = 74.000000
+                     My Calories = 51.841057
+  Lap
+                        Calories = 432.000000
+                     My Calories = 419.302128
+  Lap
+                        Calories = 104.000000
+                     My Calories = 104.663188
+  Lap
+                        Calories = 394.000000
+                     My Calories = 366.321321
+  Lap
+                        Calories = 114.000000
+                     My Calories = 114.743515
+  Lap
+                        Calories = 190.000000
+                     My Calories = 171.915569
+  Lap
+                        Calories = 1178.000000
+                     My Calories = 303.075350
+  Lap
+                        Calories = 202.000000
+                     My Calories = 192.350119
+  Lap
+                        Calories = 332.000000
+                     My Calories = 350.634296
+  Lap
+                        Calories = 88.000000
+                     My Calories = 87.409769
+  Lap
+                        Calories = 1197.000000
+                     My Calories = 384.026162
+  Lap
+                        Calories = 124.000000
+                     My Calories = 110.902637
+  Lap
+                        Calories = 86.000000
+                     My Calories = 78.020834
+  Lap
+                        Calories = 251.000000
+                     My Calories = 229.314927
+  Lap
+                        Calories = 70.000000
+                     My Calories = 58.083751
+  Lap
+                        Calories = 199.000000
+                     My Calories = 178.971174
+  Lap
+                        Calories = 60.000000
+                     My Calories = 62.202744
+  Lap
+                        Calories = 254.000000
+                     My Calories = 229.207119
+  Lap
+                        Calories = 365.000000
+                     My Calories = 335.772604
+  Lap
+                        Calories = 78.000000
+                     My Calories = 87.936449
+  Lap
+                        Calories = 54.000000
+                     My Calories = 47.701420
+  Lap
+                        Calories = 128.000000
+                     My Calories = 130.989336
+  Lap
+                        Calories = 251.000000
+                     My Calories = 232.482676
+  Lap
+                        Calories = 80.000000
+                     My Calories = 81.767072
+  Lap
+                        Calories = 228.000000
+                     My Calories = 207.761342
+  Lap
+                        Calories = 111.000000
+                     My Calories = 110.526936
+  Lap
+                        Calories = 201.000000
+                     My Calories = 213.735029
+  Lap
+                        Calories = 252.000000
+                     My Calories = 265.272980
+  Lap
+                        Calories = 22.000000
+                     My Calories = 21.638425
+  Lap
+                        Calories = 52.000000
+                     My Calories = 48.264879
+  Lap
+                        Calories = 1685.000000
+                     My Calories = 1098.082197
+  Lap
+                        Calories = 246.000000
+                     My Calories = 279.656347
+  Lap
+                        Calories = 235.000000
+                     My Calories = 253.591985
+  Lap
+                        Calories = 200.000000
+                     My Calories = 211.338296
+  Lap
+                        Calories = 513.000000
+                     My Calories = 571.247259
+  Lap
+                        Calories = 1181.000000
+                     My Calories = 1130.773019
+  Lap
+                        Calories = 550.000000
+                     My Calories = 535.777745
+  Lap
+                        Calories = 156.000000
+                     My Calories = 159.155627
+  Lap
+                        Calories = 217.000000
+                     My Calories = 233.711643
+  Lap
+                        Calories = 181.000000
+                     My Calories = 201.429881
+  Lap
+                        Calories = 282.000000
+                     My Calories = 281.979686
+  Lap
+                        Calories = 139.000000
+                     My Calories = 132.464405
+  Lap
+                        Calories = 250.000000
+                     My Calories = 323.345403
+  Lap
+                        Calories = 256.000000
+                     My Calories = 260.625441
+  Lap
+                        Calories = 399.000000
+                     My Calories = 447.121428
+  Lap
+                        Calories = 681.000000
+                     My Calories = 640.884487
+  Lap
+                        Calories = 108.000000
+                     My Calories = 64.653720
+  Lap
+                        Calories = 302.000000
+                     My Calories = 295.803628
+  Lap
+                        Calories = 28.000000
+                     My Calories = 28.300210
+  Lap
+                        Calories = 119.000000
+                     My Calories = 123.354751
+  Lap
+                        Calories = 445.000000
+                     My Calories = 450.251375
+  Lap
+                        Calories = 413.000000
+                     My Calories = 384.810876
+  Lap
+                        Calories = 326.000000
+                     My Calories = 315.564591
+  Lap
+                        Calories = 119.000000
+                     My Calories = 115.270530
+  Lap
+                        Calories = 532.000000
+                     My Calories = 512.609507
+  Lap
+                        Calories = 104.000000
+                     My Calories = 81.766308
+  Lap
+                        Calories = 361.000000
+                     My Calories = 394.480266
+  Lap
+                        Calories = 69.000000
+                     My Calories = 99.307850
+  Lap
+                        Calories = 334.000000
+                     My Calories = 323.572161
+  Lap
+                        Calories = 103.000000
+                     My Calories = 111.935055
+  Lap
+                        Calories = 439.000000
+                     My Calories = 439.083333
+  Lap
+                        Calories = 93.000000
+                     My Calories = 80.893570
+  Lap
+                        Calories = 496.000000
+                     My Calories = 512.698526
+  Lap
+                        Calories = 154.000000
+                     My Calories = 87.667696
+  Lap
+                        Calories = 143.000000
+                     My Calories = 158.972977
+  Lap
+                        Calories = 128.000000
+                     My Calories = 149.954691
+  Lap
+                        Calories = 246.000000
+                     My Calories = 252.170342
+  Lap
+                        Calories = 266.000000
+                     My Calories = 276.593565
+  Lap
+                        Calories = 123.000000
+                     My Calories = 131.333036
+  Lap
+                        Calories = 88.000000
+                     My Calories = 99.297348
+  Lap
+                        Calories = 147.000000
+                     My Calories = 144.562609
+  Lap
+                        Calories = 458.000000
+                     My Calories = 533.174054
+  Lap
+                        Calories = 77.000000
+                     My Calories = 89.281449
+  Lap
+                        Calories = 176.000000
+                     My Calories = 189.656456
+  Lap
+                        Calories = 150.000000
+                     My Calories = 168.445545
+  Lap
+                        Calories = 106.000000
+                     My Calories = 121.251632
+  Lap
+                        Calories = 221.000000
+                     My Calories = 278.694345
+  Lap
+                        Calories = 142.000000
+                     My Calories = 159.255638
+  Lap
+                        Calories = 127.000000
+                     My Calories = 145.421554
+  Lap
+                        Calories = 230.000000
+                     My Calories = 266.027370

@@ -1,1 +1,4 @@
 *.tcx
+*.pyc
+*.xls*
+*.csv
