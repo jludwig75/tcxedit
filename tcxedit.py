@@ -13,18 +13,13 @@ def main(programName, args):
         ProgramOptions.Help()
         return -1
     
-    stopTime = 0
-    #if len(args) > 1:
-    #    stopTime = int(args[1])
-    
-    tcxFile = TcxFile.ParseFile(options.FileName(), stopTime)
+    tcxFile = TcxFile.ParseFile(options.FileName(), options.StopTime())
     
     wop = WorkOutProcessor(tcxFile.activities, options)
 
     wop.DumpActivitiesByLaps()
-    #wop.DumpActivities()
     
-    if stopTime != 0:
+    if options.StopTime() != 0:
         tcxFile.write('new.tcx')
     
     return 0

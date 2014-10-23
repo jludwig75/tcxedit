@@ -1,16 +1,18 @@
 class ProgramOptions:
-    def __init__(self, fileName, plot, dumpLaps):
+    def __init__(self, fileName, plot, dumpLaps, stopTime):
         self._fileName = fileName
         self._plot = plot
         self._dumpLaps = dumpLaps
+        self._stopTime = stopTime
     
     @staticmethod
     def Help():
         print 'tcxedit.py [options] <tcx_file_name>'
         print '  tcx_file_name - The TCX file to analyze'
         print '  Options:'
-        print '    -p=<plot_options>  Speficy graphs to plot'
-        print '    -l                 Display individual laps'
+        print '    -p=<plot_options>    Speficy graphs to plot'
+        print '    -t=<time in seconds> Time at which to truncate the file'
+        print '    -l                   Display individual laps'
         print '  plot options'
         print '    a   Altitude'
         print '    s   Speed'
@@ -29,6 +31,7 @@ class ProgramOptions:
         plotOptions = ''
         dumpLaps = False
         fileName = None
+        stopTime = 0
         for arg in args:
             if arg[0] == '-':
                 if len(arg) < 2:
@@ -39,6 +42,10 @@ class ProgramOptions:
                     if len(arg) < 4 or arg[2] != '=':
                         raise Exception('Command line parse error: invalid plot option "%s"' % arg)
                     plotOptions = arg[3:]
+                elif arg[1] == 't':
+                    if len(arg) < 4 or arg[2] != '=':
+                        raise Exception('Command line parse error: invalid truncation time option "%s"' % arg)
+                    stopTime = int(arg[3:])
                 elif arg[1] == 'h' or arg[1] == '?':
                     raise Exception("Command usage:")
                 else:
@@ -49,7 +56,10 @@ class ProgramOptions:
                 fileName = arg
         if fileName is None:
             raise Exception('Command line parse error: No file name specified')
-        return ProgramOptions(fileName, plotOptions, dumpLaps)
+        return ProgramOptions(fileName, plotOptions, dumpLaps, stopTime)
+    
+    def StopTime(self):
+        return self._stopTime
     
     def FileName(self):
         return self._fileName
