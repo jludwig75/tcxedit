@@ -15,6 +15,14 @@ class ProgramOptions:
         print '    a   Altitude'
         print '    s   Speed'
         print '    h   Heart rate'
+        print '    p   Pedaling power'
+        print '    r   Power to heart rate ratio while pedaling'
+        print '    w   Power (Includes braking power)'
+        print '    j   Plot cummulative work done in joules'
+        print '    d   Plot distances'
+        print '    f   Plot forces'
+        print '    g   Plot slope grades'
+        print '    t   Shows corresponding trend lines if available for the select plots'
     
     @staticmethod
     def ParseCommandLine(args):
