@@ -2,70 +2,7 @@ import sys
 import os
 
 from tcxparser import *
-from woanalyzer import *
-
-
-class WorkOutProcessor:
-    def __init__(self, activities):
-        self.activities = activities
-    
-    def DumpActivities(self):
-        for activity in self.activities:
-            print 'Activity %s' % activity.id
-            times = []
-            distances = []
-            altitudes = []
-            heartRates = []
-            reportedCalories = 0
-            #print activity.id,
-            totalActivityTime = 0.0
-            lastTime = 0
-            for lap in activity.laps:
-                reportedCalories += lap.reportedCalories
-                tempTimes = [t + lastTime for t in lap.times]
-                times += tempTimes
-                distances += lap.distances
-                altitudes += lap.altitudes
-                heartRates += lap.heartRates
-                lastTime = times[-1]
-            staticData = StaticData(88.0, COEFF_FRIC_MTB, 0.5)
-    
-            if len(times) > 2:
-                wa = WorkOutAnalyzer(staticData, times, distances, altitudes, heartRates)
-                wa.Analyze()
-                wa.Plot()
-                #print ', %.3f' % (wa.avgPedalingPower / wa.avgHr)
-                print '  Average power while pedaling = %.1f' % wa.avgPedalingPower
-                print '     Average hr while pedaling = %.f bpm' % wa.avgHr
-                print '     power / hr while pedaling = %.2f' % (wa.avgPedalingPower / wa.avgHr)
-                print '    Analyzer joules / Calories = %f' % (wa.joules / lap.reportedCalories if lap.reportedCalories > 0 else 0)
-                print '                      Calories = %f' % lap.reportedCalories
-                print '                   My Calories = %f' % (wa.joules / 640)
-            print     '           Total activity time = %.2f' % activity.totalTime
-    
-    def DumpActivitiesByLaps(self):
-        for activity in self.activities:
-            print 'Activity %s' % activity.id
-            self.DumpLaps(activity)
-            
-    def DumpLaps(self, activity):
-        for lap in activity.laps:
-            print '  Lap %s' % lap.name
-            self.DumpLap(lap)
-            
-    def DumpLap(self, lap):
-        staticData = StaticData(88.0, COEFF_FRIC_MTB, 0.5)
-
-        if len(lap.times) > 2:
-            wa = WorkOutAnalyzer(staticData, lap.times, lap.distances, lap.altitudes, lap.heartRates)
-            wa.Analyze()
-            wa.Plot()
-            print '  Average power while pedaling = %.1f' % wa.avgPedalingPower
-            print '     Average hr while pedaling = %.f bpm' % wa.avgHr
-            print '     power / hr while pedaling = %.2f' % (wa.avgPedalingPower / wa.avgHr)
-            print '    Analyzer joules / Calories = %f' % (wa.joules / lap.reportedCalories if lap.reportedCalories > 0 else 0)
-            print '                      Calories = %f' % lap.reportedCalories
-            print '                   My Calories = %f' % (wa.joules / 640)
+from woprocessor import *
 
             
 def main(programName, args):
@@ -81,6 +18,7 @@ def main(programName, args):
     tcxFile = TcxFile.ParseFile(fileName, stopTime)
     
     wop = WorkOutProcessor(tcxFile.activities)
+
     wop.DumpActivitiesByLaps()
     #wop.DumpActivities()
     

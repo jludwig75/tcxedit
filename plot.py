@@ -62,7 +62,7 @@ class MuliPlotter:
         self.plots.append(plot)
     
     def Plot(self):
-        g = Gnuplot.Gnuplot(debug=1)
+        g = Gnuplot.Gnuplot()
         g.clear()
         plots = []
         color = 1
@@ -75,4 +75,4 @@ class MuliPlotter:
                 plots.append(Gnuplot.Func('%.4f' % plot.GetMidLine(), with_='lines linecolor %d' % color, title=''))
             color += 1
         g.plot(*plots)
-        wait('Press Enter')
+        wait()
