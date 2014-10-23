@@ -1,9 +1,10 @@
 class ProgramOptions:
-    def __init__(self, fileName, plot, dumpLaps, stopTime):
+    def __init__(self, fileName, plot, dumpLaps, stopTime, progress):
         self._fileName = fileName
         self._plot = plot
         self._dumpLaps = dumpLaps
         self._stopTime = stopTime
+        self._progress = progress
     
     @staticmethod
     def Help():
@@ -13,6 +14,7 @@ class ProgramOptions:
         print '    -p=<plot_options>    Speficy graphs to plot'
         print '    -t=<time in seconds> Time at which to truncate the file'
         print '    -l                   Display individual laps'
+        print '    -g                   Dump progress in CSV format'
         print '  plot options'
         print '    a   Altitude'
         print '    s   Speed'
@@ -32,12 +34,15 @@ class ProgramOptions:
         dumpLaps = False
         fileName = None
         stopTime = 0
+        progress = False
         for arg in args:
             if arg[0] == '-':
                 if len(arg) < 2:
                     raise Exception('Command line parse error: invalid command line option "%s"' % arg)
                 if arg[1] == 'l':
                     dumpLaps = True
+                if arg[1] == 'g':
+                    progress = True
                 elif arg[1] == 'p':
                     if len(arg) < 4 or arg[2] != '=':
                         raise Exception('Command line parse error: invalid plot option "%s"' % arg)
@@ -56,8 +61,11 @@ class ProgramOptions:
                 fileName = arg
         if fileName is None:
             raise Exception('Command line parse error: No file name specified')
-        return ProgramOptions(fileName, plotOptions, dumpLaps, stopTime)
+        return ProgramOptions(fileName, plotOptions, dumpLaps, stopTime, progress)
     
+    def DumpProgressAsCsv(self):
+        return self._progress
+
     def StopTime(self):
         return self._stopTime
     

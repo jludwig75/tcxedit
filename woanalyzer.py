@@ -13,6 +13,13 @@ class WorkOutAnalyzer:
         self.distances = distances
         self.altitudes = altitudes
         self.heartRates = heartRates
+        self.totalDistance = 0
+
+    def TotalTime(self):
+        return self.times[-1]
+    
+    def AverageSpeed(self):
+        return self.totalDistance / self.TotalTime()
     
     def Analyze(self):
         self.PreProcess()
@@ -36,6 +43,7 @@ class WorkOutAnalyzer:
         lastAltitude = self.altitudes[0]
         for i in range(len(self.times)):
             distance = self.distances[i]
+            self.totalDistance += distance
             vDistance = self.altitudes[i] - lastAltitude
             self.speeds[i] = distance / (self.times[i] - lastTime)
 

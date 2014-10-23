@@ -17,7 +17,10 @@ def main(programName, args):
     
     wop = WorkOutProcessor(tcxFile.activities, options)
 
-    wop.DumpActivitiesByLaps()
+    if options.DumpProgressAsCsv():
+        wop.DumpProgressCsv()
+    else:
+        wop.DumpActivitiesByLaps()
     
     if options.StopTime() != 0:
         tcxFile.write('new.tcx')
