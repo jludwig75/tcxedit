@@ -1,204 +1,13 @@
 import sys
 import math
-import Gnuplot
-import tempfile
 import os
-import numpy
 
 from tcxparser import *
+from plot import *
+from calc import *
+from filter import *
+from stats import *
 
-def wait(str=None, prompt='Press return to show results...\n'):
-    if str is not None:
-        print str
-    raw_input(prompt)
-
-
-
-ACCEL_OF_GRAVITY = 9.8
-AIR_DENSITY = 1.226
-DRAG_COEFFICIENT = 0.5
-COEFF_FRIC_MTB = 0.015
-COEFF_FRIC_ROAD = 0.06
-
-MAX_FILTER_WIDTH = 31
-GAUSSIAN_SMOOTH_SDEV = float(1.0)
-GAUSSIAN_SMOOT_SECONDARY_DATA = float(2.0)
-GAUSSIAN_SMOOT_TERTIARY_DATA = float(2.5)
-
-class StaticData:
-    def __init__(self, weight, friction, frontalArea):
-        self.weight = weight
-        self.friction = friction
-        self.frontalArea = frontalArea
-
-def ForceOfDrag(staticData, airSpeed):
-    return staticData.frontalArea * AIR_DENSITY * airSpeed * airSpeed * DRAG_COEFFICIENT / 2
-
-def CalcForceOfMotion(staticData, hDistance, vDistance, time):
-    if hDistance == 0:
-        return 0
-    absDistance = math.sqrt(hDistance * hDistance + vDistance * vDistance)
-    airSpeed = absDistance / time
-    gravitatyForce = staticData.weight * ACCEL_OF_GRAVITY * vDistance / hDistance
-    #print 'Slope force = %.1f Nm' % gravitatyForce
-    frictionForce = staticData.friction * staticData.weight * ACCEL_OF_GRAVITY# * hDistance / vDistance
-    #print 'Rolling resistance = %.1f Nm' % frictionForce 
-    dragForce = ForceOfDrag(staticData, airSpeed)
-    #print 'Drag resistance = %.1f Nm' % dragForce
-    totalForce = gravitatyForce + frictionForce + dragForce
-    work = totalForce * absDistance
-    power = totalForce * airSpeed
-    #print '%.3f Nm, %.3f Joules %f kcal, %.2f Watts, %.3f joules' % (totalForce, work, JoulesToKCalories(work), power, power * time) 
-    return totalForce
-    
-
-def CalcWork(staticData, hDistance, vDistance, time):
-    absDistance = math.sqrt(hDistance * hDistance + vDistance * vDistance)
-    return CalcForceOfMotion(staticData, hDistance, vDistance, time) * absDistance
-
-def JoulesToKCalories(joules):
-    return joules * 0.000239005736
-
-def TestForceCaclulations():
-    sd = StaticData(88, 0.004, 0.5)
-    force = CalcForceOfMotion(sd, 100.0, 3.0, 12.5)
-    joules = CalcWork(sd, 100.0, 3.0, 12.5)
-    kcal = JoulesToKCalories(joules)
-    print 'Force = %.2f Nm avg, %.2f Watts avg, %.2f joules, %.2f kcal' % (force, force * 8, joules, kcal)
-
-
-def ErrorPercent(actual, calculated):
-    if actual == 0:
-        return 0
-    return 100.0 * (float(calculated) - float(actual)) / float(actual)
-
-def ApplyFilter(data, filter, filter_sum):
-    mid = len(filter) / 2
-    new_data = [0] * len(data)
-    for i in range(len(data)):
-        if i < mid or i > len(data) - mid:
-            new_data[i] = data[i]
-        else:
-            sum = 0
-            #count = 0
-            for j in range(-mid, mid + 1):
-                idx = i + j
-                if idx >= 0 and idx < len(data):
-                    sum += data[idx] * filter[mid + j]
-                #count += 1
-                new_data[i] = sum / filter_sum# / count
-    return new_data
-
-def BuildGaussianFilter(width, sdev):
-    if width > MAX_FILTER_WIDTH:
-        width = MAX_FILTER_WIDTH
-    mid = width / 2
-    filter = [0] * width
-    for x in range(-mid, mid + 1):
-        filter[mid + x] = 1 / math.sqrt(2 * math.pi * sdev) * math.exp(-(x * x) / (2 * sdev * sdev))
-    return filter
-                
-def SmoothData(dataArray, sdev):
-    filter = BuildGaussianFilter(2 * ((int(sdev) * 10) / 2) + 1, sdev)#[1] * width
-    filter_sum = 0
-    for value in filter:
-        filter_sum += value
-    return ApplyFilter(dataArray, filter, filter_sum)
-
-
-class PlotData:
-    def __init__(self, title, xdata, ydata):
-        self.title = title
-        self.xdata = xdata
-        self.ydata = ydata
-        self.min = self.ydata[0]
-        self.max = self.ydata[0]
-        for value in ydata[1:]:
-            if value > self.max:
-                self.max = value
-            if value < self.min:
-                self.min = value
-    
-    def yRange(self):
-        return self.max - self.min
-    
-    def IsMidLineVisible(self):
-        #print '[%.4f - %.f4' % ()
-        return self.min < 0 and self.max > 0
-
-    def GetMidLine(self):
-        return self.yResolution * (0 - self.min) / self.yRange()
-    
-    def ScaleData(self, yResolution):
-        self.yResolution = yResolution
-        # Always normalize the data to 0
-        # Always scale normalized data from 0 to yResolution
-        base = self.min
-        yRange = self.yRange()
-        if yRange == 0:
-            yRange = yResolution
-        newYData = [0] * len(self.ydata)
-        for i in range(len(self.ydata)):
-            newYData[i] = (self.ydata[i] - base) * yResolution / yRange
-        self.ydata = newYData
-    
-    def WriteToTempFile(self):
-        self.tempFileName = tempfile.mktemp()
-        f = open(self.tempFileName, 'w')
-        for i in range(len(self.xdata)):
-            f.write('%s %s\n' % (self.xdata[i], self.ydata[i]))
-        f.close()
-        return self.tempFileName
-
-class MuliPlotter:
-    def __init__(self, yResolution):
-        self.yResolution = yResolution
-        self.plots = []
-    
-    def AddPlot(self, plot):
-        plot.ScaleData(self.yResolution)
-        self.plots.append(plot)
-    
-    def Plot(self):
-        g = Gnuplot.Gnuplot(debug=1)
-        g.clear()
-        plots = []
-        color = 1
-        g.xlabel('time (seconds)')
-        for plot in self.plots:
-            fn = plot.WriteToTempFile()
-            g.ylabel(plot.title)
-            plots.append(Gnuplot.File(fn, with_='lines linecolor %d' % color, title='%s (%.2f - %.2f)' % (plot.title, plot.min, plot.max)))
-            if plot.IsMidLineVisible():
-                plots.append(Gnuplot.Func('%.4f' % plot.GetMidLine(), with_='lines linecolor %d' % color, title=''))
-            color += 1
-        g.plot(*plots)
-        wait('Press Enter')
-
-
-def GetValueAtTime(values, times, t):
-    for i in range(len(values)):
-        if t >= times[i]:
-            if t == times[i] or i == len(times) - 1 or t > times[i+1]:
-                return values[i]
-            timeSpan = float(times[i+1] - times[i])
-            valueSpan = float(values[i+1] - values[i])
-            return values[i] + valueSpan * (t - times[i]) / timeSpan
-    return 0
-
-def Mean(data):
-    sum = 0
-    for d in data:
-        sum += d
-    return sum / len(data)
-
-def Sdev(data):
-    m = Mean(data)
-    acum = 0
-    for d in data:
-        dif = d - m;
-        acum += d * d
-    return math.sqrt(acum / len(data))             
 
 class WorkOutAnalyzer:
     def __init__(self, staticData, times, distances, altitudes, heartRates):
@@ -350,16 +159,15 @@ class WorkOutAnalyzer:
         #self.heartRates = SmoothData(self.heartRates, GAUSSIAN_SMOOTH_SDEV)
         #self.speeds = SmoothData(self.speeds, GAUSSIAN_SMOOTH_SDEV)
         
-        mp = MuliPlotter(10000)
         
-        pedalingPower = [x if x > 0 else 0 for x in self.power]
+        self.pedalingPower = [x if x > 0 else 0 for x in self.power]
         
         pedalingJoules = 0
         timePedaling = 0
         lastTime = 0
         hrTime = 0
-        for i in range(len(pedalingPower)):
-            if pedalingPower[i] > 0:
+        for i in range(len(self.pedalingPower)):
+            if self.pedalingPower[i] > 0:
                 elapsed = self.times[i] - lastTime
                 timePedaling += elapsed
                 pedalingJoules += elapsed * self.power[i]
@@ -369,18 +177,21 @@ class WorkOutAnalyzer:
         self.avgPedalingPower = pedalingJoules / timePedaling
         self.avgHr = hrTime / timePedaling
         
-        pedalingPowerTrend = SmoothData(pedalingPower, 20.0)
-        hrTrend = SmoothData(self.heartRates, 20.0)
+        self.pedalingPowerTrend = SmoothData(self.pedalingPower, 20.0)
+        self.hrTrend = SmoothData(self.heartRates, 20.0)
         
-        pwrToHr = [pedalingPowerTrend[i] / hrTrend[i] for i in range(len(self.times))]
+        self.pwrToHr = [self.pedalingPowerTrend[i] / self.hrTrend[i] for i in range(len(self.times))]
+    
+    def Plot(self):
+        mp = MuliPlotter(10000)
         
         #mp.AddPlot(PlotData("hr", self.times, self.heartRates))
         #mp.AddPlot(PlotData("altitude", self.times, self.altitudes))
         #mp.AddPlot(PlotData("speed", self.times, self.speeds))
-        #mp.AddPlot(PlotData("pedaling power", self.times, pedalingPower))
-        #mp.AddPlot(PlotData("hr trend", self.times, hrTrend))
-        #mp.AddPlot(PlotData("pedaling power trend", self.times, pedalingPowerTrend))
-        mp.AddPlot(PlotData("power to HR", self.times[MAX_FILTER_WIDTH / 2:-MAX_FILTER_WIDTH / 2], pwrToHr[MAX_FILTER_WIDTH / 2:-MAX_FILTER_WIDTH / 2]))
+        #mp.AddPlot(PlotData("pedaling power", self.times, self.pedalingPower))
+        #mp.AddPlot(PlotData("hr trend", self.times, self.hrTrend))
+        #mp.AddPlot(PlotData("pedaling power trend", self.times, self.pedalingPowerTrend))
+        mp.AddPlot(PlotData("power to HR", self.times[MAX_FILTER_WIDTH / 2:-MAX_FILTER_WIDTH / 2], self.pwrToHr[MAX_FILTER_WIDTH / 2:-MAX_FILTER_WIDTH / 2]))
         #mp.AddPlot(PlotData("power", self.times, self.power))
         #mp.AddPlot(PlotData("distance", self.times, self.distances))
         #mp.AddPlot(PlotData("total force", self.times, self.ft))
@@ -394,8 +205,7 @@ class WorkOutAnalyzer:
         #mp.AddPlot(PlotData("pwr skewed", self.powerTime, self.power))
         
         mp.Plot()
-        #sys.exit(0)
-    
+        
     def CalcHRPowerFactor(self, timeSkew):
         self.hrpw = [0] * len(self.times)
         self.powerTime = self.times[:]
@@ -463,6 +273,7 @@ class WorkOutProcessor:
             if len(times) > 2:
                 wa = WorkOutAnalyzer(staticData, times, distances, altitudes, heartRates)
                 wa.Analyze()
+                wa.Plot()
                 #print ', %.3f' % (wa.avgPedalingPower / wa.avgHr)
                 print '  Average power while pedaling = %.1f' % wa.avgPedalingPower
                 print '     Average hr while pedaling = %.f bpm' % wa.avgHr
