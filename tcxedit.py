@@ -1,23 +1,27 @@
 import sys
 import os
 
-from tcxparser import *
-from woprocessor import *
-
+from tcxparser import TcxFile
+from woprocessor import WorkOutProcessor
+from options import *
             
 def main(programName, args):
-    TestForceCaclulations()
+    try:
+        options = ProgramOptions.ParseCommandLine(sys.argv[1:])
+    except Exception as e:
+        print '%s\n' % e
+        ProgramOptions.Help()
+        return -1
+    
     fileName = args[0]
     
     stopTime = 0
-    if len(args) > 1:
-        stopTime = int(args[1])
+    #if len(args) > 1:
+    #    stopTime = int(args[1])
     
-    print 'Processing file "%s"' % fileName
+    tcxFile = TcxFile.ParseFile(options.FileName(), stopTime)
     
-    tcxFile = TcxFile.ParseFile(fileName, stopTime)
-    
-    wop = WorkOutProcessor(tcxFile.activities)
+    wop = WorkOutProcessor(tcxFile.activities, options)
 
     wop.DumpActivitiesByLaps()
     #wop.DumpActivities()

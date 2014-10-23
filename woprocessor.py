@@ -1,8 +1,9 @@
 from woanalyzer import *
 
 class WorkOutProcessor:
-    def __init__(self, activities):
+    def __init__(self, activities, programOptions):
         self.activities = activities
+        self.programOptions = programOptions
     
     def DumpActivities(self):
         for activity in self.activities:
@@ -32,7 +33,8 @@ class WorkOutProcessor:
         if len(times) > 2:
             wa = WorkOutAnalyzer(staticData, times, distances, altitudes, heartRates)
             wa.Analyze()
-            wa.Plot()
+            if self.programOptions.DoPlots():
+                wa.Plot(self.programOptions)
             #print ', %.3f' % (wa.avgPedalingPower / wa.avgHr)
             self.DumpAnalyzerData(wa)
         print     '          Total activity time = %.2f' % activity.totalTime
@@ -41,7 +43,8 @@ class WorkOutProcessor:
         for activity in self.activities:
             self.DumpActivity(activity)
             print ''
-            self.DumpLaps(activity)
+            if self.programOptions.DumpLaps():
+                self.DumpLaps(activity)
             
     def DumpLaps(self, activity):
         for lap in activity.laps:
@@ -55,7 +58,8 @@ class WorkOutProcessor:
         if len(lap.times) > 2:
             wa = WorkOutAnalyzer(staticData, lap.times, lap.distances, lap.altitudes, lap.heartRates)
             wa.Analyze()
-            wa.Plot()
+            if self.programOptions.DoPlots():
+                wa.Plot(self.programOptions)
             self.DumpAnalyzerData(wa, 5)
             print '      Analyzer joules / Reported Calories = %f' % (wa.joules / lap.reportedCalories if lap.reportedCalories > 0 else 0)
             print '                        Reported Calories = %f' % lap.reportedCalories

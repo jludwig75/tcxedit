@@ -179,26 +179,37 @@ class WorkOutAnalyzer:
         
         self.pwrToHr = [self.pedalingPowerTrend[i] / self.hrTrend[i] for i in range(len(self.times))]
     
-    def Plot(self):
+    def Plot(self, options):
         mp = MuliPlotter(10000)
         
-        #mp.AddPlot(PlotData("hr", self.times, self.heartRates))
-        #mp.AddPlot(PlotData("altitude", self.times, self.altitudes))
-        #mp.AddPlot(PlotData("speed", self.times, self.speeds))
-        #mp.AddPlot(PlotData("pedaling power", self.times, self.pedalingPower))
-        #mp.AddPlot(PlotData("hr trend", self.times, self.hrTrend))
-        #mp.AddPlot(PlotData("pedaling power trend", self.times, self.pedalingPowerTrend))
-        mp.AddPlot(PlotData("power to HR", self.times[MAX_FILTER_WIDTH / 2:-MAX_FILTER_WIDTH / 2], self.pwrToHr[MAX_FILTER_WIDTH / 2:-MAX_FILTER_WIDTH / 2]))
-        #mp.AddPlot(PlotData("power", self.times, self.power))
-        #mp.AddPlot(PlotData("distance", self.times, self.distances))
-        #mp.AddPlot(PlotData("total force", self.times, self.ft))
-        #mp.AddPlot(PlotData("slope", self.times, self.slopes))
-        #mp.AddPlot(PlotData("slope force", self.times, self.fs))
-        #mp.AddPlot(PlotData("drag", self.times, self.fd))
-        #mp.AddPlot(PlotData("Fr", self.times, self.ft))
-        #mp.AddPlot(PlotData("Ft", self.times, self.fr))
-        #mp.AddPlot(PlotData("work", self.times, self.joulesCum))
-        #mp.AddPlot(PlotData("pwr/hr", self.times, self.hrpw))
+        if options.DoHeartRatePlot():
+            mp.AddPlot(PlotData("hr", self.times, self.heartRates))
+        if options.DoAltitudePlot():
+            mp.AddPlot(PlotData("altitude", self.times, self.altitudes))
+        if options.DoSpeedPlot():
+            mp.AddPlot(PlotData("speed", self.times, self.speeds))
+        if options.DoPedalingPowerPlot():
+            mp.AddPlot(PlotData("pedaling power", self.times, self.pedalingPower))
+        if options.DoHeartRatePlot() and options.DoTrendPlots():
+            mp.AddPlot(PlotData("hr trend", self.times, self.hrTrend))
+        if options.DoPowerPlot() and options.DoTrendPlots():
+            mp.AddPlot(PlotData("pedaling power trend", self.times, self.pedalingPowerTrend))
+        if options.DoPwrToHrPlot():
+            mp.AddPlot(PlotData("power to HR", self.times[MAX_FILTER_WIDTH / 2:-MAX_FILTER_WIDTH / 2], self.pwrToHr[MAX_FILTER_WIDTH / 2:-MAX_FILTER_WIDTH / 2]))
+        if options.DoPowerPlot():
+            mp.AddPlot(PlotData("power", self.times, self.power))
+        if options.DoGradePlot():
+            mp.AddPlot(PlotData("slope", self.times, self.slopes))
+        if options.DoDistancePlots():
+            mp.AddPlot(PlotData("distance", self.times, self.distances))
+        if options.DoForcePlots():
+            mp.AddPlot(PlotData("total force", self.times, self.ft))
+            mp.AddPlot(PlotData("slope force", self.times, self.fs))
+            mp.AddPlot(PlotData("drag", self.times, self.fd))
+            mp.AddPlot(PlotData("Fr", self.times, self.ft))
+            mp.AddPlot(PlotData("Ft", self.times, self.fr))
+        if options.DoJoulesPlot():
+            mp.AddPlot(PlotData("work", self.times, self.joulesCum))
         #mp.AddPlot(PlotData("pwr skewed", self.powerTime, self.power))
         
         mp.Plot()
