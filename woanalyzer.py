@@ -179,7 +179,7 @@ class WorkOutAnalyzer:
         self.pedalingPowerTrend = SmoothData(self.pedalingPower, 20.0)
         self.hrTrend = SmoothData(self.heartRates, 20.0)
         
-        self.pwrToHr = [self.pedalingPowerTrend[i] / self.hrTrend[i] for i in range(len(self.times))]
+        self.pwrToHr = [self.pedalingPowerTrend[i] / (self.hrTrend[i] if self.hrTrend[i] > 0 else 100) for i in range(len(self.times))]
     
     def Plot(self, options):
         mp = MuliPlotter(10000)
