@@ -174,6 +174,8 @@ class WorkOutAnalyzer:
         self.avgPedalingPower = pedalingJoules / timePedaling
         self.avgHr = hrTime / timePedaling
         
+        self.slopesTrend = SmoothData(self.slopes, 5.0)
+
         self.pedalingPowerTrend = SmoothData(self.pedalingPower, 20.0)
         self.hrTrend = SmoothData(self.heartRates, 20.0)
         
@@ -200,6 +202,8 @@ class WorkOutAnalyzer:
             mp.AddPlot(PlotData("power", self.times, self.power))
         if options.DoGradePlot():
             mp.AddPlot(PlotData("slope", self.times, self.slopes))
+        if options.DoGradePlot() and options.DoTrendPlots():
+            mp.AddPlot(PlotData("slope trend", self.times, self.slopesTrend))
         if options.DoDistancePlots():
             mp.AddPlot(PlotData("distance", self.times, self.distances))
         if options.DoForcePlots():
