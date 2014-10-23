@@ -74,6 +74,7 @@ class Lap:
     
     def StoreReportedData(self, lapXml):
         self.lapXml = lapXml
+        self.name = lapXml.attrib['StartTime']
         
         self.reportedTotalTime = float(lapXml.find(TAG_NAME('TotalTimeSeconds')).text)
         self.reportedDistance = float(lapXml.find(TAG_NAME('DistanceMeters')).text)
