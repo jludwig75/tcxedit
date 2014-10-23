@@ -13,8 +13,6 @@ def main(programName, args):
         ProgramOptions.Help()
         return -1
     
-    fileName = args[0]
-    
     stopTime = 0
     #if len(args) > 1:
     #    stopTime = int(args[1])

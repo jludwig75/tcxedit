@@ -47,6 +47,8 @@ class ProgramOptions:
                 if fileName != None:
                     raise Exception('Command line parse error: More than one file name specified')
                 fileName = arg
+        if fileName is None:
+            raise Exception('Command line parse error: No file name specified')
         return ProgramOptions(fileName, plotOptions, dumpLaps)
     
     def FileName(self):
